@@ -12,6 +12,7 @@ import { InsightsDisclaimer } from "@/components/InsightsDisclaimer";
 import { ComparisonMode } from "@/components/ComparisonMode";
 import { BudgetFilter } from "@/components/BudgetFilter";
 import { InvestmentCalculator } from "@/components/InvestmentCalculator";
+import { Tooltip } from "@/components/ui/tooltip-custom";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { BarChart3, Home as HomeIcon, User, TrendingUp, Home as Building, List, Map, Calculator, LineChart, Sparkles, Search } from "lucide-react";
@@ -131,51 +132,56 @@ export default function Home() {
         {/* Sidebar - only show after user sends first message */}
         {state.messages.length > 0 && (
           <div className="w-14 flex-shrink-0 border-r bg-card/50 flex flex-col items-center justify-start py-3 gap-1.5">
-            <Button
-              variant={sidebarMode === "valuation" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setSidebarMode("valuation")}
-              className="w-10 h-10"
-              title="Valuation & Insights"
-            >
-              <Sparkles className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={sidebarMode === "search" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setSidebarMode("search")}
-              className="w-10 h-10"
-              title="Search & Filter"
-            >
-              <Search className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={sidebarMode === "properties" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setSidebarMode("properties")}
-              className="w-10 h-10"
-              title="Property Listings"
-            >
-              <Building className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={sidebarMode === "market-trends" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setSidebarMode("market-trends")}
-              className="w-10 h-10"
-              title="Market Trends"
-            >
-              <LineChart className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={sidebarMode === "investment" ? "secondary" : "ghost"}
-              size="icon"
-              onClick={() => setSidebarMode("investment")}
-              className="w-10 h-10"
-              title="Investment Analysis"
-            >
-              <Calculator className="h-4 w-4" />
-            </Button>
+            <Tooltip content="Valuation & Insights" side="right">
+              <Button
+                variant={sidebarMode === "valuation" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setSidebarMode("valuation")}
+                className="w-10 h-10"
+              >
+                <Sparkles className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Search & Filter" side="right">
+              <Button
+                variant={sidebarMode === "search" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setSidebarMode("search")}
+                className="w-10 h-10"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Property Listings" side="right">
+              <Button
+                variant={sidebarMode === "properties" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setSidebarMode("properties")}
+                className="w-10 h-10"
+              >
+                <Building className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Market Trends" side="right">
+              <Button
+                variant={sidebarMode === "market-trends" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setSidebarMode("market-trends")}
+                className="w-10 h-10"
+              >
+                <LineChart className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Investment Analysis" side="right">
+              <Button
+                variant={sidebarMode === "investment" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setSidebarMode("investment")}
+                className="w-10 h-10"
+              >
+                <Calculator className="h-4 w-4" />
+              </Button>
+            </Tooltip>
           </div>
         )}
 
