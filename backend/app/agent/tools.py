@@ -34,6 +34,22 @@ class LocationSearchResult:
     message: str
 
 
+@dataclass
+class EmbodiedCarbonResult:
+    """Result from embodied carbon calculation."""
+    success: bool
+    location: str
+    current_emissions: Optional[float]
+    potential_emissions: Optional[float]
+    emissions_metric: Optional[str]
+    energy_rating: Optional[str]
+    property_size: Optional[float]
+    property_type: Optional[str]
+    recommendations: list[dict]
+    a2ui_messages: list[dict]
+    summary: str
+
+
 # Tool definitions for the LLM (OpenAI function calling format)
 TOOL_DEFINITIONS = [
     {
@@ -97,6 +113,26 @@ TOOL_DEFINITIONS = [
                 }
             },
             "required": ["location1", "location2"]
+        }
+    },
+    {
+        "name": "get_embodied_carbon",
+        "description": "Calculate embodied carbon emissions for a property at a given location. Uses ScanSan API to fetch property details including energy performance data and calculates carbon footprint. Use this when the user asks about carbon emissions, environmental impact, or sustainability of a property.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The location to get carbon data for. Can be a UK postcode (e.g., 'NW1 2BU', 'E14 5AB') or UPRN (Unique Property Reference Number)."
+                },
+                "property_type": {
+                    "type": "string",
+                    "description": "Type of property (flat, house, studio). Optional if UPRN is provided.",
+                    "enum": ["flat", "house", "studio"],
+                    "default": "flat"
+                }
+            },
+            "required": ["location"]
         }
     }
 ]
@@ -257,6 +293,210 @@ async def execute_compare_areas(
     }
 
 
+async def execute_get_embodied_carbon(
+    location: str,
+    property_type: str = "flat",
+) -> EmbodiedCarbonResult:
+    """
+    Execute the embodied carbon calculation tool.
+    
+    This fetches property energy performance data from ScanSan API
+    and calculates embodied carbon emissions.
+    
+    Args:
+        location: Location string (postcode or UPRN)
+        property_type: Type of property (flat, house, studio)
+        
+    Returns:
+        EmbodiedCarbonResult with carbon data and UI components
+    """
+    from ..a2ui_builder import build_carbon_card
+    
+    client = get_scansan_client()
+    
+    try:
+        # Get real data from ScanSan API (no fallback to mock)
+        energy_data = None
+        uprn = None
+        
+        # Check if location is a UPRN (numeric) or postcode
+        if location.replace(" ", "").isdigit():
+            # It's a UPRN
+            uprn = location
+            print(f"\n[CARBON] Fetching energy performance for UPRN: {uprn}")
+            energy_data = await client.get_property_energy_performance(uprn)
+        else:
+            # It's a postcode - try direct postcode endpoint first (simpler)
+            print(f"\n[CARBON] Fetching energy performance for postcode: {location}")
+            energy_data = await client.get_postcode_energy_performance(location)
+            
+            # If that fails, try the UPRN lookup method
+            if not energy_data:
+                print(f"[CARBON] Direct postcode lookup failed, trying UPRN lookup...")
+                uprn = await client.get_uprn_from_postcode(location)
+                print(f"[CARBON] Found UPRN: {uprn}")
+                
+                if uprn:
+                    print(f"[CARBON] Fetching energy performance for UPRN: {uprn}")
+                    energy_data = await client.get_property_energy_performance(uprn)
+                else:
+                    raise ValueError(f"Could not find UPRN for postcode: {location}")
+        
+        # Debug: Print what we got from the API
+        print(f"\n[CARBON] Energy Performance Data Response:")
+        print(f"[CARBON] {'='*60}")
+        if energy_data:
+            import json
+            print(json.dumps(energy_data, indent=2))
+        else:
+            print("[CARBON] No data returned from API")
+        print(f"[CARBON] {'='*60}\n")
+        
+        # Process real data - fail if not available
+        if not energy_data:
+            raise ValueError(f"No energy performance data returned from ScanSan API for UPRN: {uprn}")
+        
+        if "annual_CO2_emissions" in energy_data:
+            # Real ScanSan data
+            property_address = energy_data.get("property_address", location)
+            property_size = energy_data.get("property_size", 75)
+            property_size_metric = energy_data.get("property_size_metric", "sqm")
+            
+            epc_data = energy_data.get("EPC", {})
+            energy_rating = epc_data.get("current_rating", "C")
+            
+            co2_data = energy_data.get("annual_CO2_emissions", {})
+            current_emissions = co2_data.get("current_emissions", 1.8)
+            potential_emissions = co2_data.get("potential_emissions", 1.2)
+            emissions_metric = co2_data.get("emissions_metric", "tonnes CO2/year")
+            
+            # Get recommendations from API
+            savings_data = energy_data.get("savings_and_recommendations", {})
+            api_recommendations = savings_data.get("energy_saving_recommendations", [])
+            
+            recommendations = []
+            for rec in api_recommendations[:5]:  # Limit to top 5
+                rec_text = rec.get("recommendations", "")
+                min_cost = rec.get("min_installation_cost", 0)
+                max_cost = rec.get("max_installation_cost", 0)
+                
+                # Estimate carbon reduction (simplified calculation)
+                # Assuming each recommendation contributes proportionally to potential savings
+                total_reduction = current_emissions - potential_emissions
+                estimated_reduction = total_reduction / max(len(api_recommendations), 1)
+                
+                cost_str = f"£{min_cost:,}" if min_cost == max_cost else f"£{min_cost:,} - £{max_cost:,}"
+                
+                recommendations.append({
+                    "recommendation": rec_text,
+                    "potential_reduction": round(estimated_reduction, 2),
+                    "cost_estimate": cost_str,
+                })
+            
+            # Infer property type from API data if available
+            api_property_type = energy_data.get("property_type", property_type)
+            if api_property_type:
+                property_type = api_property_type.lower()
+            
+            print(f"[CARBON] Processed data successfully:")
+            print(f"[CARBON]   - Current emissions: {current_emissions} {emissions_metric}")
+            print(f"[CARBON]   - Potential emissions: {potential_emissions} {emissions_metric}")
+            print(f"[CARBON]   - EPC rating: {energy_rating}")
+            print(f"[CARBON]   - Recommendations: {len(recommendations)}")
+        
+        else:
+            # No CO2 emissions data in response - this is required
+            raise ValueError(
+                f"Energy performance data for UPRN {uprn} does not contain CO2 emissions data. "
+                f"Available fields: {list(energy_data.keys())}"
+            )
+        
+        # Validate data
+        if current_emissions is None or current_emissions <= 0:
+            raise ValueError("Invalid current emissions data")
+        
+        if potential_emissions is None or potential_emissions < 0:
+            potential_emissions = current_emissions * 0.7  # Assume 30% reduction potential
+        
+        # Build A2UI messages
+        a2ui_messages = build_carbon_card(
+            location=property_address,
+            current_emissions=current_emissions,
+            potential_emissions=potential_emissions,
+            emissions_metric=emissions_metric,
+            energy_rating=energy_rating,
+            property_size=property_size,
+            property_type=property_type,
+            recommendations=recommendations,
+        )
+        
+        # Generate summary
+        reduction_percent = ((current_emissions - potential_emissions) / current_emissions) * 100
+        summary = (
+            f"For {property_address}, the property currently emits {current_emissions:.1f} tonnes of CO2 per year "
+            f"with an EPC rating of {energy_rating}. "
+            f"With recommended improvements, emissions could be reduced to {potential_emissions:.1f} tonnes/year "
+            f"(a {reduction_percent:.0f}% reduction). "
+        )
+        
+        if recommendations:
+            summary += f"Top recommendations include: {', '.join([r['recommendation'] for r in recommendations[:2]])}."
+        
+        return EmbodiedCarbonResult(
+            success=True,
+            location=property_address,
+            current_emissions=current_emissions,
+            potential_emissions=potential_emissions,
+            emissions_metric=emissions_metric,
+            energy_rating=energy_rating,
+            property_size=property_size,
+            property_type=property_type,
+            recommendations=recommendations,
+            a2ui_messages=a2ui_messages,
+            summary=summary,
+        )
+        
+    except ValueError as e:
+        # Data validation error
+        return EmbodiedCarbonResult(
+            success=False,
+            location=location,
+            current_emissions=None,
+            potential_emissions=None,
+            emissions_metric=None,
+            energy_rating=None,
+            property_size=None,
+            property_type=property_type,
+            recommendations=[],
+            a2ui_messages=[],
+            summary=f"Invalid data for {location}: {str(e)}. Please try a different property or postcode.",
+        )
+    
+    except Exception as e:
+        # General error - provide helpful message
+        error_msg = str(e)
+        if "404" in error_msg or "not found" in error_msg.lower():
+            summary = f"No energy performance data found for {location}. This property may not have an EPC certificate on record."
+        elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+            summary = f"Unable to connect to property database for {location}. Please try again later."
+        else:
+            summary = f"Error calculating embodied carbon for {location}: {error_msg}"
+        
+        return EmbodiedCarbonResult(
+            success=False,
+            location=location,
+            current_emissions=None,
+            potential_emissions=None,
+            emissions_metric=None,
+            energy_rating=None,
+            property_size=None,
+            property_type=property_type,
+            recommendations=[],
+            a2ui_messages=[],
+            summary=summary,
+        )
+
+
 async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Execute a tool by name with given arguments.
@@ -301,6 +541,25 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             horizon_months=arguments.get("horizon_months", 6),
         )
         return result
+    
+    elif tool_name == "get_embodied_carbon":
+        result = await execute_get_embodied_carbon(
+            location=arguments["location"],
+            property_type=arguments.get("property_type", "flat"),
+        )
+        return {
+            "success": result.success,
+            "location": result.location,
+            "current_emissions": result.current_emissions,
+            "potential_emissions": result.potential_emissions,
+            "emissions_metric": result.emissions_metric,
+            "energy_rating": result.energy_rating,
+            "property_size": result.property_size,
+            "property_type": result.property_type,
+            "recommendations": result.recommendations,
+            "a2ui_messages": result.a2ui_messages,
+            "summary": result.summary,
+        }
     
     else:
         return {
