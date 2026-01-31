@@ -7,26 +7,37 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { A2UIRenderer } from "@/components/A2UIRenderer";
 import { PropertyListView } from "@/components/PropertyListView";
 import { PropertyMapView } from "@/components/PropertyMapView";
+import { InsightsActions } from "@/components/InsightsActions";
+import { InsightsDisclaimer } from "@/components/InsightsDisclaimer";
+import { ComparisonMode } from "@/components/ComparisonMode";
+import { BudgetFilter } from "@/components/BudgetFilter";
+import { InvestmentCalculator } from "@/components/InvestmentCalculator";
+import { Tooltip } from "@/components/ui/tooltip-custom";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { BarChart3, Home as HomeIcon, User, TrendingUp, Home as Building, List, Map } from "lucide-react";
+import { BarChart3, Home as HomeIcon, User, TrendingUp, Home as Building, List, Map, Calculator, LineChart, Sparkles, Search } from "lucide-react";
 
 export default function Home() {
   const { state, sendMessage, reset } = useChatStream();
   const { state: propertyState, fetchListings } = usePropertyListings();
-  const [showA2UIPanel, setShowA2UIPanel] = useState(true);
   const [activeTab, setActiveTab] = useState("home");
-  const [sidebarMode, setSidebarMode] = useState<"rent-analysis" | "buying-selling">("rent-analysis");
+  const [sidebarMode, setSidebarMode] = useState<"valuation" | "properties" | "market-trends" | "investment" | "search">("valuation");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [comparedAreas, setComparedAreas] = useState<string[]>([]);
+  const [savedAreas, setSavedAreas] = useState<string[]>([]);
+  const [currentArea, setCurrentArea] = useState<string>("");
 
   const handleSendMessage = useCallback((message: string) => {
     sendMessage(message);
     
-    // If in buying-selling mode, try to extract area code and fetch listings
-    if (sidebarMode === "buying-selling") {
-      const areaCodeMatch = message.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\b/i);
-      if (areaCodeMatch) {
-        const areaCode = areaCodeMatch[1].toUpperCase();
+    // Extract area code from message
+    const areaCodeMatch = message.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\b/i);
+    if (areaCodeMatch) {
+      const areaCode = areaCodeMatch[1].toUpperCase();
+      setCurrentArea(areaCode);
+      
+      // If in buying-selling mode, fetch listings
+      if (sidebarMode === "buying-selling") {
         fetchListings(areaCode, "sale");
       }
     }
@@ -36,10 +47,52 @@ export default function Home() {
     reset();
   }, [reset]);
 
+  const handleAddCompareArea = useCallback((areaCode: string) => {
+    if (!comparedAreas.includes(areaCode) && comparedAreas.length < 3) {
+      setComparedAreas([...comparedAreas, areaCode]);
+    }
+  }, [comparedAreas]);
+
+  const handleRemoveCompareArea = useCallback((areaCode: string) => {
+    setComparedAreas(comparedAreas.filter(a => a !== areaCode));
+  }, [comparedAreas]);
+
+  const handleToggleSave = useCallback(() => {
+    if (currentArea) {
+      if (savedAreas.includes(currentArea)) {
+        setSavedAreas(savedAreas.filter(a => a !== currentArea));
+      } else {
+        setSavedAreas([...savedAreas, currentArea]);
+      }
+    }
+  }, [currentArea, savedAreas]);
+
+  const handleBudgetSearch = useCallback((budget: number, bedrooms?: number) => {
+    const bedroomText = bedrooms ? `${bedrooms}-bedroom ` : "";
+    sendMessage(`Show me areas where I can rent a ${bedroomText}property for around £${budget} per month`);
+  }, [sendMessage]);
+
   const hasA2UIContent = state.a2uiState.isReady && state.a2uiState.rootId;
+  
+  // Extract prediction data for investment calculator
+  const getPredictionData = () => {
+    if (!hasA2UIContent) return null;
+    try {
+      const p50 = state.a2uiState.dataModel?.prediction?.p50 as number;
+      const location = state.a2uiState.dataModel?.location as string;
+      if (p50 && location) {
+        return { p50, location };
+      }
+    } catch (e) {
+      // Silently fail if data structure is different
+    }
+    return null;
+  };
+  
+  const predictionData = getPredictionData();
 
   return (
-    <main className="h-screen w-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/20">
+    <main className="h-screen w-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/20 overflow-hidden">
       <header className="flex-shrink-0 border-b bg-card/80 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60">
         <div className="w-full flex h-16 items-center justify-between px-6 max-w-full">
           <div className="flex items-center gap-3">
@@ -75,51 +128,117 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden w-full">
-        {/* Sidebar */}
-        <div className="w-20 flex-shrink-0 border-r bg-card/50 flex flex-col items-center py-4 gap-3">
-          <Button
-            variant={sidebarMode === "rent-analysis" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setSidebarMode("rent-analysis")}
-            className="w-12 h-12"
-            title="Rent Analysis"
-          >
-            <TrendingUp className="h-5 w-5" />
-          </Button>
-          <Button
-            variant={sidebarMode === "buying-selling" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setSidebarMode("buying-selling")}
-            className="w-12 h-12"
-            title="Buying & Selling"
-          >
-            <Building className="h-5 w-5" />
-          </Button>
-        </div>
+      <div className="flex-1 flex overflow-hidden w-full min-h-0">
+        {/* Sidebar - only show after user sends first message */}
+        {state.messages.length > 0 && (
+          <div className="w-14 flex-shrink-0 border-r bg-card/50 flex flex-col items-center justify-start py-3 gap-1.5">
+            <Tooltip content="Valuation & Insights" side="right">
+              <Button
+                variant={sidebarMode === "valuation" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setSidebarMode("valuation")}
+                className="w-10 h-10"
+              >
+                <Sparkles className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Search & Filter" side="right">
+              <Button
+                variant={sidebarMode === "search" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setSidebarMode("search")}
+                className="w-10 h-10"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Property Listings" side="right">
+              <Button
+                variant={sidebarMode === "properties" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setSidebarMode("properties")}
+                className="w-10 h-10"
+              >
+                <Building className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Market Trends" side="right">
+              <Button
+                variant={sidebarMode === "market-trends" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setSidebarMode("market-trends")}
+                className="w-10 h-10"
+              >
+                <LineChart className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Investment Analysis" side="right">
+              <Button
+                variant={sidebarMode === "investment" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => setSidebarMode("investment")}
+                className="w-10 h-10"
+              >
+                <Calculator className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+          </div>
+        )}
 
         {/* Chat Panel */}
-        <div className={`flex-shrink-0 border-r transition-all duration-300 ${showA2UIPanel && (hasA2UIContent || sidebarMode === "buying-selling") ? "w-full md:w-1/2 lg:w-2/5" : "w-full"}`}>
+        <div className={`flex-shrink-0 border-r transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "w-full md:w-[45%] lg:w-[38%]" : "w-full"}`}>
           <ChatPanel
             messages={state.messages}
             onSendMessage={handleSendMessage}
             isLoading={state.isLoading}
             currentTool={state.currentTool}
             streamingContent={state.streamingContent}
-            onTogglePanel={() => setShowA2UIPanel(!showA2UIPanel)}
-            showPanel={showA2UIPanel}
           />
         </div>
 
         {/* Insights/Property Panel */}
-        {showA2UIPanel && (
-          <div className={`flex-1 overflow-hidden transition-all duration-300 ${hasA2UIContent || sidebarMode === "buying-selling" ? "block" : "hidden md:block"}`}>
-            {sidebarMode === "rent-analysis" ? (
-              <div className="h-full overflow-y-auto bg-muted/30">
+        {(
+          <div className={`flex-1 overflow-hidden transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "block" : "hidden md:block"}`}>
+            {/* Valuation & AI Insights */}
+            {sidebarMode === "valuation" && (
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
                 {hasA2UIContent ? (
-                  <div className="p-6 space-y-4">
-                    <A2UIRenderer state={state.a2uiState} />
-                  </div>
+                  <>
+                    {/* Action Buttons Header */}
+                    <InsightsActions 
+                      isSaved={currentArea && savedAreas.includes(currentArea)}
+                      onToggleSave={currentArea ? handleToggleSave : undefined}
+                    />
+                    
+                    {/* Scrollable Content */}
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="p-6 space-y-6">
+                        {/* Comparison Tool */}
+                        <ComparisonMode
+                          comparedAreas={comparedAreas}
+                          onAddArea={handleAddCompareArea}
+                          onRemoveArea={handleRemoveCompareArea}
+                        />
+                        
+                        {/* Budget Filter */}
+                        <BudgetFilter onSearch={handleBudgetSearch} />
+                        
+                        {/* Main Insights */}
+                        <A2UIRenderer state={state.a2uiState} />
+                        
+                        {/* Investment Calculator (if we have prediction data) */}
+                        {predictionData && (
+                          <InvestmentCalculator 
+                            predictedRent={predictionData.p50}
+                            location={predictionData.location}
+                          />
+                        )}
+                      </div>
+                      
+                      {/* Disclaimer Footer */}
+                      <InsightsDisclaimer />
+                    </div>
+                  </>
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     <div className="text-center px-8 py-12 max-w-md">
@@ -134,12 +253,50 @@ export default function Home() {
                   </div>
                 )}
               </div>
-            ) : (
+            )}
+            
+            {/* Search & Filter Page */}
+            {sidebarMode === "search" && (
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
+                <div className="flex-shrink-0 p-4 border-b bg-card/50">
+                  <h2 className="text-lg font-semibold text-foreground">Search & Filter</h2>
+                  <p className="text-xs text-muted-foreground">Find properties by budget and criteria</p>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {/* Budget Filter */}
+                  <BudgetFilter onSearch={handleBudgetSearch} />
+                  
+                  {/* Comparison Tool */}
+                  <ComparisonMode
+                    comparedAreas={comparedAreas}
+                    onAddArea={handleAddCompareArea}
+                    onRemoveArea={handleRemoveCompareArea}
+                  />
+                  
+                  <div className="p-6 bg-card border border-border rounded-lg text-center">
+                    <Search className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold mb-2">Quick Search Tips</h3>
+                    <ul className="text-xs text-muted-foreground space-y-1 text-left">
+                      <li>• Search by postcode (e.g., "NW1", "E14")</li>
+                      <li>• Filter by budget and bedrooms</li>
+                      <li>• Compare up to 3 areas</li>
+                      <li>• Ask "Show me areas under £2000/month"</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Property Listings Page */}
+            {sidebarMode === "properties" && (
               <div className="h-full flex flex-col bg-muted/30">
                 {/* View Toggle */}
                 <div className="flex-shrink-0 border-b px-4 py-3 bg-card/50">
                   <div className="flex items-center justify-between">
-                    <h2 className="font-semibold text-sm">Property Listings</h2>
+                    <div>
+                      <h2 className="text-lg font-semibold text-foreground">Property Listings</h2>
+                      <p className="text-xs text-muted-foreground">Available properties in your area</p>
+                    </div>
                     <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                       <Button
                         variant={viewMode === "list" ? "secondary" : "ghost"}
@@ -173,6 +330,85 @@ export default function Home() {
                     />
                   ) : (
                     <PropertyMapView />
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Market Trends Page */}
+            {sidebarMode === "market-trends" && (
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
+                <div className="flex-shrink-0 p-4 border-b bg-card/50">
+                  <h2 className="text-lg font-semibold text-foreground">Market Trends</h2>
+                  <p className="text-xs text-muted-foreground">Historical data and market analysis</p>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6">
+                  {hasA2UIContent ? (
+                    <div className="space-y-6">
+                      <A2UIRenderer state={state.a2uiState} />
+                      <InsightsDisclaimer />
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center px-8 py-12 max-w-md">
+                        <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
+                          <LineChart className="w-10 h-10 text-primary" />
+                        </div>
+                        <h3 className="text-lg font-semibold mb-2">Market Trends</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Ask about a location to see historical trends, forecast timelines, and market patterns.
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Try: "Show me rental trends for NW1"
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {/* Investment Analysis Page */}
+            {sidebarMode === "investment" && (
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
+                <div className="flex-shrink-0 p-4 border-b bg-card/50">
+                  <h2 className="text-lg font-semibold text-foreground">Investment Analysis</h2>
+                  <p className="text-xs text-muted-foreground">ROI and rental yield calculations</p>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6">
+                  {predictionData ? (
+                    <div className="space-y-6">
+                      <InvestmentCalculator 
+                        predictedRent={predictionData.p50}
+                        location={predictionData.location}
+                      />
+                      <div className="p-6 bg-card border border-border rounded-lg">
+                        <h3 className="text-sm font-semibold mb-3">Investment Tips</h3>
+                        <ul className="text-xs text-muted-foreground space-y-2">
+                          <li>✓ Aim for 5%+ rental yield in most UK markets</li>
+                          <li>✓ Consider capital growth potential alongside yield</li>
+                          <li>✓ Factor in 20-30% for costs (maintenance, void periods, fees)</li>
+                          <li>✓ Check local demand indicators and transport links</li>
+                          <li>✓ Compare against savings account returns (typically 3-5%)</li>
+                        </ul>
+                      </div>
+                      <InsightsDisclaimer />
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center px-8 py-12 max-w-md">
+                        <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
+                          <Calculator className="w-10 h-10 text-primary" />
+                        </div>
+                        <h3 className="text-lg font-semibold mb-2">Investment Calculator</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Get a rental valuation first, then calculate your investment returns.
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Try: "What's the expected rent for a 2-bed in E14?"
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

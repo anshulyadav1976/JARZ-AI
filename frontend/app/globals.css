@@ -27,24 +27,14 @@ body {
   background: linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--muted) / 0.2) 100%);
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Hide scrollbars but keep scroll functionality */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
 }
 
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+*::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
 }
 
 
@@ -114,4 +104,75 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Print Styles for Clean PDF Export */
+@media print {
+  /* Hide interactive elements */
+  header,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset backgrounds for print */
+  body,
+  * {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Ensure content fits */
+  main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Page breaks */
+  .page-break {
+    page-break-before: always;
+  }
+
+  .page-break-avoid {
+    page-break-inside: avoid;
+  }
+
+  /* Better spacing */
+  .print-spacing {
+    margin-bottom: 1rem;
+  }
+
+  /* Show print-only elements */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Optimize charts and images */
+  svg,
+  img {
+    max-width: 100%;
+    page-break-inside: avoid;
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes bounce-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+.animate-bounce-subtle {
+  animation: bounce-subtle 2s ease-in-out 0.5s;
+}
+
+.animate-pulse-slow {
+  animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }

@@ -9,6 +9,7 @@ import { NeighbourHeatmapMap } from "./NeighbourHeatmapMap";
 import { DriversBar } from "./DriversBar";
 import { WhatIfControls } from "./WhatIfControls";
 import { CarbonCard } from "./CarbonCard";
+import { InvestmentCalculator } from "./InvestmentCalculator";
 
 interface A2UIRendererProps {
   state: StreamState;
