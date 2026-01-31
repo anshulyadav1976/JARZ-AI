@@ -6,12 +6,17 @@ from functools import lru_cache
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
+    # OpenRouter LLM Configuration
+    openrouter_api_key: str = ""
+    llm_model: str = "openai/gpt-4o-mini"  # Default model
+    llm_base_url: str = "https://openrouter.ai/api/v1"
+    
     # ScanSan API
     scansan_api_key: str = ""
     scansan_base_url: str = "https://api.scansan.com/v1"
     use_scansan: bool = False
     
-    # Model configuration
+    # Model configuration (PLACEHOLDER - teammate will change these)
     model_provider: str = "stub"  # stub | local_pickle | http
     model_path: str = "./models/model.pkl"
     model_http_url: str = "http://localhost:8001/predict"

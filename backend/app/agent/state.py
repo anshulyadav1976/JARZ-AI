@@ -11,7 +11,11 @@ from ..schemas import (
 
 
 class AgentState(TypedDict, total=False):
-    """State passed through the agent workflow."""
+    """
+    State passed through the agent workflow.
+    
+    This is used for the direct pipeline (form-based input).
+    """
     
     # Input
     query: UserQuery
@@ -42,3 +46,51 @@ class AgentState(TypedDict, total=False):
     
     # Processing status
     status: str
+
+
+class ChatMessage(TypedDict, total=False):
+    """A message in the chat conversation."""
+    role: str  # "system", "user", "assistant", "tool"
+    content: Optional[str]
+    tool_calls: Optional[list[dict]]
+    tool_call_id: Optional[str]
+    name: Optional[str]
+
+
+class PendingToolCall(TypedDict):
+    """A pending tool call to be executed."""
+    id: str
+    name: str
+    arguments: dict[str, Any]
+
+
+class ChatAgentState(TypedDict, total=False):
+    """
+    State for the chat-based conversational agent.
+    
+    This agent uses an LLM to decide when to call tools and how to respond.
+    """
+    
+    # Chat history - list of messages
+    messages: list[ChatMessage]
+    
+    # Pending tool calls from the LLM
+    pending_tool_calls: list[PendingToolCall]
+    
+    # A2UI messages to render in the side panel
+    a2ui_messages: list[dict[str, Any]]
+    
+    # Current valuation result (if any)
+    current_valuation: Optional[dict[str, Any]]
+    
+    # Stream output - text chunks and events to send to frontend
+    stream_output: list[dict[str, Any]]
+    
+    # Error state
+    error: Optional[str]
+    
+    # Processing status
+    status: str  # "thinking", "tool_calling", "responding", "complete", "error"
+    
+    # Whether the agent should continue (tool calling loop)
+    should_continue: bool

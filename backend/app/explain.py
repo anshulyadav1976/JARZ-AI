@@ -1,14 +1,40 @@
-"""Explainability module for prediction drivers."""
+"""
+Explainability module for prediction drivers.
+
+=============================================================================
+PLACEHOLDER MODULE - HEURISTIC EXPLANATIONS
+=============================================================================
+
+The explain_stub() function provides PLACEHOLDER heuristic explanations.
+When teammate's real model is integrated, explain_shap() will use actual
+SHAP values for proper feature attribution.
+
+To enable real SHAP explanations:
+1. Install shap: pip install shap
+2. Set MODEL_PROVIDER to local_pickle or http (not stub)
+3. Ensure the model is tree-based (XGBoost, LightGBM, RandomForest, etc.)
+=============================================================================
+"""
 from typing import Optional
 from .schemas import ModelFeatures, PredictionResult, ExplanationResult, Driver
 from .config import get_settings
 
 
+# =============================================================================
+# PLACEHOLDER: Heuristic Explanation
+# =============================================================================
+# This provides fake but plausible explanations for the stub model.
+# Replace with real SHAP values when teammate's model is integrated.
+# =============================================================================
+
 def explain_stub(features: ModelFeatures) -> ExplanationResult:
     """
-    Generate heuristic explanation for stub model.
+    PLACEHOLDER: Generate heuristic explanation for stub model.
+    
+    !!! THIS IS A PLACEHOLDER - NOT REAL SHAP VALUES !!!
     
     Creates plausible driver contributions based on feature values.
+    Will be replaced by real SHAP computation when model is integrated.
     """
     drivers = []
     

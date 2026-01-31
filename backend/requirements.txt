@@ -16,7 +16,10 @@ langgraph>=0.0.40
 # Environment variables
 python-dotenv>=1.0.0
 
-# Optional: for real model integration
+# OpenRouter LLM integration
+openai>=1.0.0  # OpenRouter uses OpenAI-compatible API
+
+# Optional: for real model integration (PLACEHOLDER - teammate will enable)
 # shap>=0.44.0
 # joblib>=1.3.0
 # numpy>=1.26.0

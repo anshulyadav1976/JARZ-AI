@@ -1,15 +1,25 @@
-"""FastAPI application with SSE streaming for A2UI."""
+"""FastAPI application with SSE streaming for A2UI and chat."""
 import json
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
+from pydantic import BaseModel
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 
 from .schemas import UserQuery, QueryRequest, QueryResponse
-from .agent.graph import run_agent, stream_agent
+from .agent.graph import run_agent, stream_agent, run_chat_agent, stream_chat_agent
+from .agent.state import ChatMessage
 from .scansan_client import get_scansan_client
+from .llm_client import get_llm_client
+
+
+# Request models for chat API
+class ChatRequest(BaseModel):
+    """Request for chat endpoint."""
+    message: str
+    history: Optional[list[dict]] = None
 
 
 @asynccontextmanager
@@ -19,8 +29,10 @@ async def lifespan(app: FastAPI):
     print("Starting JARZ Rental Valuation API...")
     yield
     # Shutdown
-    client = get_scansan_client()
-    await client.close()
+    scansan_client = get_scansan_client()
+    await scansan_client.close()
+    llm_client = get_llm_client()
+    await llm_client.close()
     print("Shutting down...")
 
 
@@ -154,6 +166,173 @@ async def get_area_summary(area_code: str):
     client = get_scansan_client()
     summary = await client.get_area_summary(area_code)
     return summary
+
+
+# =============================================================================
+# Chat API Endpoints
+# =============================================================================
+
+@app.post("/api/chat")
+async def chat_endpoint(request: ChatRequest) -> dict:
+    """
+    Chat endpoint - run conversational agent and return response.
+    
+    This runs the chat agent which can call tools and respond to the user.
+    Returns the full response including any A2UI messages.
+    """
+    try:
+        # Convert history to proper format
+        history: list[ChatMessage] = []
+        if request.history:
+            for msg in request.history:
+                history.append({
+                    "role": msg.get("role", "user"),
+                    "content": msg.get("content"),
+                    "tool_calls": msg.get("tool_calls"),
+                    "tool_call_id": msg.get("tool_call_id"),
+                    "name": msg.get("name"),
+                })
+        
+        # Run chat agent
+        final_state = await run_chat_agent(request.message, history)
+        
+        # Check for errors
+        if final_state.get("error"):
+            raise HTTPException(status_code=400, detail=final_state["error"])
+        
+        # Get the last assistant message
+        messages = final_state.get("messages", [])
+        assistant_response = None
+        for msg in reversed(messages):
+            if msg.get("role") == "assistant" and msg.get("content"):
+                assistant_response = msg["content"]
+                break
+        
+        return {
+            "success": True,
+            "response": assistant_response,
+            "a2ui_messages": final_state.get("a2ui_messages", []),
+            "messages": messages,  # Full conversation history
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def generate_chat_sse_events(
+    message: str,
+    history: list[ChatMessage] = None,
+) -> AsyncGenerator[dict, None]:
+    """Generate SSE events from chat agent execution."""
+    try:
+        async for event in stream_chat_agent(message, history):
+            event_type = event.get("type", "unknown")
+            
+            if event_type == "node":
+                yield {
+                    "event": "status",
+                    "data": json.dumps({
+                        "node": event.get("node"),
+                        "status": event.get("status"),
+                    }),
+                }
+            
+            elif event_type == "text":
+                yield {
+                    "event": "text",
+                    "data": json.dumps({
+                        "content": event.get("content", ""),
+                    }),
+                }
+            
+            elif event_type == "tool_start":
+                yield {
+                    "event": "tool_start",
+                    "data": json.dumps({
+                        "tool": event.get("tool"),
+                        "arguments": event.get("arguments"),
+                    }),
+                }
+            
+            elif event_type == "tool_end":
+                yield {
+                    "event": "tool_end",
+                    "data": json.dumps({
+                        "tool": event.get("tool"),
+                        "success": event.get("success"),
+                    }),
+                }
+            
+            elif event_type == "a2ui":
+                # Stream each A2UI message individually
+                for a2ui_msg in event.get("messages", []):
+                    yield {
+                        "event": "a2ui",
+                        "data": json.dumps(a2ui_msg),
+                    }
+            
+            elif event_type == "error":
+                yield {
+                    "event": "error",
+                    "data": json.dumps({
+                        "error": event.get("error"),
+                    }),
+                }
+            
+            elif event_type == "complete":
+                # Stream any remaining A2UI messages
+                for a2ui_msg in event.get("a2ui_messages", []):
+                    yield {
+                        "event": "a2ui",
+                        "data": json.dumps(a2ui_msg),
+                    }
+                
+                yield {
+                    "event": "complete",
+                    "data": json.dumps({
+                        "status": "complete",
+                    }),
+                }
+    
+    except Exception as e:
+        yield {
+            "event": "error",
+            "data": json.dumps({"error": str(e)}),
+        }
+
+
+@app.post("/api/chat/stream")
+async def chat_stream_endpoint(request: ChatRequest):
+    """
+    Streaming chat endpoint - returns SSE stream of text chunks and A2UI messages.
+    
+    Events:
+    - status: Agent status updates (node, status)
+    - text: Text content chunks from assistant
+    - tool_start: Tool execution started
+    - tool_end: Tool execution completed
+    - a2ui: A2UI component message
+    - error: Error occurred
+    - complete: Processing complete
+    """
+    # Convert history
+    history: list[ChatMessage] = []
+    if request.history:
+        for msg in request.history:
+            history.append({
+                "role": msg.get("role", "user"),
+                "content": msg.get("content"),
+                "tool_calls": msg.get("tool_calls"),
+                "tool_call_id": msg.get("tool_call_id"),
+                "name": msg.get("name"),
+            })
+    
+    return EventSourceResponse(
+        generate_chat_sse_events(request.message, history),
+        media_type="text/event-stream",
+    )
 
 
 if __name__ == "__main__":

@@ -1,4 +1,35 @@
-"""Model adapter with stub, pickle, and HTTP implementations."""
+"""
+Model adapter with stub, pickle, and HTTP implementations.
+
+=============================================================================
+PLACEHOLDER MODULE - FOR TEAMMATE INTEGRATION
+=============================================================================
+
+This entire module contains PLACEHOLDER implementations for the ML model.
+The actual trained spatio-temporal model will be built by a teammate.
+
+HOW TO INTEGRATE YOUR MODEL:
+1. If providing a pickle file:
+   - Set MODEL_PROVIDER=local_pickle in .env
+   - Set MODEL_PATH to your model file path
+   - Ensure your model has a predict_quantiles() method returning {"p10", "p50", "p90"}
+
+2. If providing an HTTP service:
+   - Set MODEL_PROVIDER=http in .env  
+   - Set MODEL_HTTP_URL to your service endpoint
+   - Your endpoint should accept POST with ModelFeatures JSON
+   - Return {"p10": float, "p50": float, "p90": float, "unit": str}
+
+3. If you want to replace the adapter directly:
+   - Create a new class extending ModelAdapter
+   - Implement predict_quantiles() method
+   - Update get_model_adapter() factory function
+
+The StubModelAdapter is a deterministic placeholder that returns plausible
+rent values based on feature hashing. It should be replaced with the real
+model for production use.
+=============================================================================
+"""
 import hashlib
 import math
 from abc import ABC, abstractmethod
@@ -10,7 +41,12 @@ from .schemas import ModelFeatures, PredictionResult, PredictionMetadata
 
 
 class ModelAdapter(ABC):
-    """Abstract base class for model adapters."""
+    """
+    Abstract base class for model adapters.
+    
+    This interface defines the contract between the agent and the ML model.
+    Teammate should implement this interface or use one of the existing adapters.
+    """
     
     @abstractmethod
     def predict_quantiles(self, features: ModelFeatures) -> PredictionResult:
@@ -18,7 +54,7 @@ class ModelAdapter(ABC):
         Predict rent quantiles (P10, P50, P90).
         
         Args:
-            features: Model input features
+            features: Model input features (see ModelFeatures schema)
             
         Returns:
             PredictionResult with quantile predictions
@@ -32,17 +68,28 @@ class ModelAdapter(ABC):
         return [self.predict_quantiles(f) for f in features_list]
 
 
+# =============================================================================
+# PLACEHOLDER: StubModelAdapter
+# =============================================================================
+# This is a PLACEHOLDER model that returns deterministic pseudo-random values.
+# Replace with actual trained model from teammate.
+# =============================================================================
+
 class StubModelAdapter(ModelAdapter):
     """
-    Deterministic stub model for development.
+    PLACEHOLDER: Deterministic stub model for development.
+    
+    !!! THIS IS A PLACEHOLDER - NOT A REAL ML MODEL !!!
     
     Uses feature hash for reproducible pseudo-random outputs.
-    Returns plausible London rent values.
+    Returns plausible London rent values for demo purposes.
+    
+    TODO: Replace with actual trained spatio-temporal model from teammate.
     """
     
     def __init__(self):
         self.base_rent = 2000  # Base rent in GBP
-        self.version = "stub-v1"
+        self.version = "placeholder-stub-v1"  # Marked as placeholder
     
     def _feature_hash(self, features: ModelFeatures) -> int:
         """Generate deterministic hash from features."""
@@ -114,13 +161,30 @@ class StubModelAdapter(ModelAdapter):
         )
 
 
+# =============================================================================
+# PLACEHOLDER: PickleModelAdapter  
+# =============================================================================
+# This adapter is READY for teammate's pickle model file.
+# Set MODEL_PROVIDER=local_pickle and MODEL_PATH in .env to use.
+# =============================================================================
+
 class PickleModelAdapter(ModelAdapter):
-    """Load model from pickle file."""
+    """
+    PLACEHOLDER: Load model from pickle file.
+    
+    Ready for teammate's trained model. Set environment variables:
+    - MODEL_PROVIDER=local_pickle
+    - MODEL_PATH=./path/to/your/model.pkl
+    
+    Expected model interface:
+    - model.predict_quantiles(features_dict) -> {"p10", "p50", "p90"}
+    - OR model.predict(feature_array) -> point prediction (quantiles estimated)
+    """
     
     def __init__(self, model_path: str):
         self.model_path = model_path
         self.model = None
-        self.version = "pickle-v1"
+        self.version = "placeholder-pickle-v1"
         self._load_model()
     
     def _load_model(self):
@@ -180,12 +244,29 @@ class PickleModelAdapter(ModelAdapter):
         return StubModelAdapter().predict_quantiles(features)
 
 
+# =============================================================================
+# PLACEHOLDER: HTTPModelAdapter
+# =============================================================================
+# This adapter is READY for teammate's model HTTP service.
+# Set MODEL_PROVIDER=http and MODEL_HTTP_URL in .env to use.
+# =============================================================================
+
 class HTTPModelAdapter(ModelAdapter):
-    """Call remote model service via HTTP."""
+    """
+    PLACEHOLDER: Call remote model service via HTTP.
+    
+    Ready for teammate's model service. Set environment variables:
+    - MODEL_PROVIDER=http
+    - MODEL_HTTP_URL=http://your-model-service/predict
+    
+    Expected API:
+    - POST with JSON body containing ModelFeatures
+    - Response: {"p10": float, "p50": float, "p90": float, "unit": str}
+    """
     
     def __init__(self, model_url: str):
         self.model_url = model_url
-        self.version = "http-v1"
+        self.version = "placeholder-http-v1"
     
     def predict_quantiles(self, features: ModelFeatures) -> PredictionResult:
         """Call remote model service."""
