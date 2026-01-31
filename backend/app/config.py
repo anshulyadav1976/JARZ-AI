@@ -1,4 +1,5 @@
 """Configuration settings for the backend."""
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
@@ -8,7 +9,7 @@ class Settings(BaseSettings):
     
     # OpenRouter LLM Configuration
     openrouter_api_key: str = ""
-    llm_model: str = "openai/gpt-4o-mini"  # Default model
+    llm_model: str = "openai/gpt-5-nano"  # Default model (per hackathon plan)
     llm_base_url: str = "https://openrouter.ai/api/v1"
     
     # ScanSan API
@@ -26,7 +27,14 @@ class Settings(BaseSettings):
     enable_cache: bool = True
     
     class Config:
-        env_file = ".env"
+        # Support both:
+        # - backend/.env (when running from backend/)
+        # - repo-root .env (common in this project)
+        _here = Path(__file__).resolve()
+        env_file = [
+            str(_here.parents[1] / ".env"),  # backend/.env
+            str(_here.parents[2] / ".env"),  # repo-root/.env
+        ]
         env_file_encoding = "utf-8"
 
 

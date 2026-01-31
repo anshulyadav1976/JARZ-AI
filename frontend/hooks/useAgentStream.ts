@@ -164,7 +164,7 @@ export function useAgentStream(): UseAgentStreamResult {
 
             for (const line of lines) {
               if (line.startsWith("data: ")) {
-                const jsonStr = line.slice(6);
+                const jsonStr = line.slice(6).trim();
                 try {
                   const data = JSON.parse(jsonStr);
                   processMessage(data);

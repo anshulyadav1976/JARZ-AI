@@ -281,10 +281,7 @@ async def stream_chat_agent(
         "should_continue": True,
     }
     
-    # Track what we've already yielded
-    yielded_output_count = 0
-    
-    # Stream through the graph
+    # Stream through the graph (each node's stream_output is that node's output only)
     async for event in graph.astream(initial_state):
         for node_name, node_output in event.items():
             # Yield node info
@@ -294,11 +291,10 @@ async def stream_chat_agent(
                 "status": node_output.get("status"),
             }
             
-            # Yield any new stream output
+            # Yield all stream output from this node (per-node, not cumulative)
             stream_output = node_output.get("stream_output", [])
-            for i in range(yielded_output_count, len(stream_output)):
-                yield stream_output[i]
-            yielded_output_count = len(stream_output)
+            for item in stream_output:
+                yield item
             
             # Yield error if present
             if node_output.get("error"):
@@ -307,19 +303,8 @@ async def stream_chat_agent(
                     "error": node_output["error"],
                 }
             
-            # Yield final state info when complete
+            # Yield final state info when complete (text already yielded via stream_output)
             if node_output.get("status") == "complete":
-                # Get the last assistant message
-                msgs = node_output.get("messages", [])
-                assistant_msgs = [m for m in msgs if m.get("role") == "assistant"]
-                if assistant_msgs:
-                    last_msg = assistant_msgs[-1]
-                    if last_msg.get("content"):
-                        yield {
-                            "type": "text",
-                            "content": last_msg["content"],
-                        }
-                
                 yield {
                     "type": "complete",
                     "a2ui_messages": node_output.get("a2ui_messages", []),

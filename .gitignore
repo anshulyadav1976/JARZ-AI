@@ -1,4 +1,5 @@
 /frontend/node_modules
+/frontend/.next/
 /backend/.env/
 /backend/.env.*
 /backend/env.txt
@@ -49,3 +50,7 @@ omg my brain is fried.txt
 /venv/bin/pip-list
 /backend/venv/
 venv
+
+# Python caches
+**/__pycache__/
+**/*.pyc

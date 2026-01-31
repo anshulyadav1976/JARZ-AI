@@ -262,7 +262,7 @@ export function useChatStream(): UseChatStreamResult {
               }
 
               if (line.startsWith("data: ")) {
-                const jsonStr = line.slice(6);
+                const jsonStr = line.slice(6).trim();
                 try {
                   const data = JSON.parse(jsonStr);
 

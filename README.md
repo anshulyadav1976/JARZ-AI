@@ -1,43 +1,134 @@
-# JARZ-AI
+# JARZ-AI (RentRadar) — Spatio‑Temporal Rental Valuation (Hackathon)
 
-This repository contains the JARZ-AI project. The repository layout has been organized to separate frontend, backend, and model assets and to document how to run each component.
+This repo contains a **FastAPI + LangGraph** backend and a **Next.js** frontend.
 
-## Repository layout
+The UX is a **chat interface**. As the user chats, the LLM agent can call tools (e.g. `get_rent_forecast`) and stream:
+- **assistant text** into the chat panel
+- **A2UI (Agent→UI) messages** into the insights side panel
 
-Top-level structure
-- README.md                  — This file
-- .gitignore                 — files to ignore in git
-- plan.md                    — project plan and notes
-- docs/                      — design, architecture and API docs
-- backend/                   — backend service (API, server-side logic)
-  - README.md                — how to run and configure the backend
-  - .env                     — environment variables (do not commit secrets)
-  - src/                     — backend source code
-  - requirements.txt / package.json
-  - scripts/                 — backend scripts (migrations, start, etc.)
-- frontend/                  — frontend application
-  - README.md                — how to run and configure the frontend
-  - package.json / yarn.lock
-  - src/                     — frontend source code
-  - public/                  — static public assets
-- models/ (or `JARZ-AI/`)    — model code, notebooks, trained model artifacts
-  - notebooks/
-  - model-files/
-- docs/                      — design docs, architecture diagrams, API reference
-- tools/ or scripts/         — repo-level scripts (deploy, ci helpers)
-- examples/                  — example usage, quick start demos
-- tests/                     — integration / e2e tests
+> Important: Model code here is intentionally **PLACEHOLDER** (stub/pickle/http adapters). A teammate will swap in the real trained model later.
 
-Notes:
-- Environment variables: The file `env.txt` has been moved to `backend/.env`. The secret contained in `env.txt` has been committed in the repository history — rotate any exposed keys immediately.
-- Move or add code: Keep frontend and backend self-contained with their own README and dependency files.
-- Large files: Avoid committing large model binaries; use Git LFS or external storage for trained models.
+## Repo layout (actual)
 
-## How to get started (quick)
+- `plan.md`: Hackathon plan (single source of truth — don’t edit unless explicitly intended)
+- `backend/`: FastAPI API + LangGraph agents
+  - `backend/app/main.py`: API routes + SSE streaming endpoints
+  - `backend/app/agent/`: LangGraph graphs/nodes/state + tool definitions
+  - `backend/app/model_adapter.py`: placeholder model adapters (stub/pickle/http)
+  - `backend/app/a2ui_builder.py`: builds A2UI messages for the frontend to render
+- `frontend/`: Next.js app (chat + A2UI renderer)
+  - `frontend/app/page.tsx`: split view (chat left, insights right)
+  - `frontend/hooks/useChatStream.ts`: consumes backend SSE `/api/chat/stream`
+  - `frontend/components/A2UIRenderer.tsx`: maps A2UI components → React components
 
-1. Backend:
-   - Move environment variables into `backend/.env` (already created) and do not commit secrets.
-   - From `backend/`, follow instructions in `backend/README.md` to install dependencies and run the service.
+## Quickstart (Windows / PowerShell)
 
-2. Frontend:
-   - From `frontend/`, follow `frontend/README.md` to install and run the frontend.
+### Prereqs
+
+- Python **3.11 or 3.12 recommended** (Python 3.14 may show dependency warnings)
+- Node.js **18+** (20+ OK)
+
+### 1) Backend setup
+
+From repo root:
+
+```powershell
+cd backend
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+#### Backend environment variables
+
+- Copy `backend/.env.example` → `backend/.env` and fill in values **OR**
+- Put the same variables in repo-root `.env`
+
+The backend is configured to load env from both `backend/.env` and repo-root `.env`.
+
+Required (for chat LLM):
+
+- `OPENROUTER_API_KEY`
+- `LLM_MODEL` (recommended: `openai/gpt-5-nano`)
+- `LLM_BASE_URL` (recommended: `https://openrouter.ai/api/v1`)
+
+Optional:
+
+- `USE_SCANSAN=false` for offline/dev mode
+- `SCANSAN_API_KEY` + `SCANSAN_BASE_URL` if you enable ScanSan calls
+
+#### Run backend
+
+On Windows, port 8000 can be blocked. We usually run on **8001**:
+
+```powershell
+python -m uvicorn app.main:app --reload --port 8001
+```
+
+Backend URL: `http://127.0.0.1:8001`
+
+### 2) Frontend setup
+
+In a second terminal:
+
+```powershell
+cd frontend
+npm install
+```
+
+#### Frontend environment variables
+
+Set the backend URL in `frontend/.env.local`:
+
+```
+NEXT_PUBLIC_API_URL=http://localhost:8001
+```
+
+#### Run frontend
+
+```powershell
+npm run dev
+```
+
+Frontend URL: `http://localhost:3000`
+
+## How to use (end-to-end)
+
+1. Open `http://localhost:3000`
+2. Ask something like:
+   - “What’s the rent forecast for NW1?”
+   - “Show me a 12‑month forecast for E14”
+3. You should see:
+   - Streaming assistant response in chat
+   - A2UI insights on the right (Summary, Chart, Map, Drivers, etc.)
+
+## API endpoints (backend)
+
+- `POST /api/chat/stream` (SSE): main chat + A2UI streaming endpoint used by the frontend
+- `POST /api/chat`: non-streaming chat (returns full response payload)
+- `POST /api/query`: legacy non-chat “pipeline” endpoint
+- `POST /api/stream`: legacy A2UI streaming endpoint (non-chat)
+
+## Troubleshooting
+
+### “WinError 10013” when starting Uvicorn on port 8000
+
+Use another port (e.g. 8001/5000) and update `frontend/.env.local` accordingly.
+
+### Chat shows no response even though backend returns 200
+
+Common causes:
+- Missing `OPENROUTER_API_KEY` (backend logs show something like `Bearer ` / illegal header)
+- SSE parsing on Windows CRLF (`\r\n`) — frontend parsers must `.trim()` the `data:` payload before `JSON.parse()`
+
+### Don’t commit secrets
+
+Never commit `.env`, `.env.local`, or API keys. Rotate keys if they were ever committed.
+
+## Contributor guide
+
+See `AGENTS.md` for project-specific rules:
+- how to add LangGraph tools safely
+- how to emit A2UI components
+- how the frontend consumes SSE and renders A2UI
+- do/don’t rules to avoid breaking the demo
