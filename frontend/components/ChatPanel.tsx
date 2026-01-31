@@ -2,6 +2,10 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage, Message, TypingIndicator, ToolIndicator } from "./ChatMessage";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { MessageSquare, Send, Loader2, PanelRightClose, PanelRight } from "lucide-react";
 
 interface ChatPanelProps {
   messages: Message[];
@@ -9,6 +13,8 @@ interface ChatPanelProps {
   isLoading: boolean;
   currentTool?: { name: string; isRunning: boolean } | null;
   streamingContent?: string;
+  onTogglePanel: () => void;
+  showPanel: boolean;
 }
 
 export function ChatPanel({
@@ -17,12 +23,13 @@ export function ChatPanel({
   isLoading,
   currentTool,
   streamingContent,
+  onTogglePanel,
+  showPanel,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-scroll to bottom when messages change
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
@@ -31,17 +38,14 @@ export function ChatPanel({
     scrollToBottom();
   }, [messages, streamingContent, scrollToBottom]);
 
-  // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = input.trim();
     if (!trimmed || isLoading) return;
-
     onSendMessage(trimmed);
     setInput("");
   };
 
-  // Handle keyboard shortcuts
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -49,7 +53,6 @@ export function ChatPanel({
     }
   };
 
-  // Auto-resize textarea
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
@@ -57,169 +60,89 @@ export function ChatPanel({
     }
   }, [input]);
 
-  // Build display messages (including streaming content)
   const displayMessages = [...messages];
   if (streamingContent) {
-    // If there's streaming content, add or update the last assistant message
     const lastMsg = displayMessages[displayMessages.length - 1];
     if (lastMsg && lastMsg.role === "assistant" && lastMsg.isStreaming) {
-      // Update existing streaming message
-      displayMessages[displayMessages.length - 1] = {
-        ...lastMsg,
-        content: streamingContent,
-      };
+      displayMessages[displayMessages.length - 1] = { ...lastMsg, content: streamingContent };
     } else {
-      // Add new streaming message
-      displayMessages.push({
-        id: "streaming",
-        role: "assistant",
-        content: streamingContent,
-        isStreaming: true,
-      });
+      displayMessages.push({ id: "streaming", role: "assistant", content: streamingContent, isStreaming: true });
     }
   }
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-slate-900">
-      {/* Header */}
-      <div className="flex-shrink-0 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-          Chat with JARZ
-        </h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Ask about UK rental valuations and market insights
-        </p>
+    <div className="flex flex-col h-full bg-background">
+      <div className="flex-shrink-0 px-6 py-4">
+        <div className="flex items-center justify-end">
+          <Button
+            variant={showPanel ? "default" : "outline"}
+            size="sm"
+            onClick={onTogglePanel}
+            className="gap-2"
+          >
+            {showPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRight className="h-4 w-4" />}
+            <span className="hidden sm:inline">{showPanel ? "Hide" : "Show"} Insights</span>
+          </Button>
+        </div>
       </div>
-
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
-        {/* Welcome message if no messages */}
+      
+      <ScrollArea className="flex-1 px-6 pt-6">
         {displayMessages.length === 0 && (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-              <svg
-                className="w-8 h-8 text-blue-500"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-                />
-              </svg>
+          <div className="text-center py-12">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-full flex items-center justify-center">
+              <MessageSquare className="w-8 h-8 text-primary" />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              Welcome to JARZ
-            </h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-sm mx-auto">
-              I can help you with UK rental valuations, market analysis, and
-              property insights. Try asking:
+            <h3 className="text-lg font-medium mb-2">Welcome to RentRadar</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
+              Get AI-powered rental valuations, market analysis, and property insights.
             </p>
-            <div className="space-y-2">
+            <div className="space-y-2 max-w-md mx-auto">
               {[
                 "What's the rent forecast for NW1?",
                 "Tell me about Camden's rental market",
                 "Show me a 12-month forecast for E14",
               ].map((suggestion, idx) => (
-                <button
+                <Button
                   key={idx}
-                  onClick={() => {
-                    setInput(suggestion);
-                    inputRef.current?.focus();
-                  }}
-                  className="block w-full max-w-xs mx-auto text-left px-4 py-2 text-sm bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg text-gray-700 dark:text-gray-300 transition-colors"
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal"
+                  onClick={() => { setInput(suggestion); inputRef.current?.focus(); }}
                 >
-                  "{suggestion}"
-                </button>
+                  {suggestion}
+                </Button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Messages list */}
-        {displayMessages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
-        ))}
+        <div className="py-4 space-y-4">
+          {displayMessages.map((message) => (
+            <ChatMessage key={message.id} message={message} />
+          ))}
+          {currentTool && <ToolIndicator toolName={currentTool.name} isRunning={currentTool.isRunning} />}
+          {isLoading && !streamingContent && !currentTool && <TypingIndicator />}
+          <div ref={messagesEndRef} />
+        </div>
+      </ScrollArea>
 
-        {/* Tool indicator */}
-        {currentTool && (
-          <ToolIndicator
-            toolName={currentTool.name}
-            isRunning={currentTool.isRunning}
+      <div className="flex-shrink-0 border-t px-6 py-4">
+        <form onSubmit={handleSubmit} className="flex gap-2">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask about rental valuations..."
+            disabled={isLoading}
+            rows={1}
+            className="flex-1 px-4 py-3 rounded-lg border bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            style={{ minHeight: "48px", maxHeight: "120px" }}
           />
-        )}
-
-        {/* Typing indicator (when loading and no streaming content) */}
-        {isLoading && !streamingContent && !currentTool && <TypingIndicator />}
-
-        {/* Scroll anchor */}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input area */}
-      <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
-        <form onSubmit={handleSubmit} className="flex gap-3">
-          <div className="flex-1 relative">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask about rental valuations..."
-              disabled={isLoading}
-              rows={1}
-              className="w-full px-4 py-3 pr-12 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ minHeight: "48px", maxHeight: "120px" }}
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={!input.trim() || isLoading}
-            className="flex-shrink-0 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isLoading ? (
-              <svg
-                className="w-5 h-5 animate-spin"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-            ) : (
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-                />
-              </svg>
-            )}
-          </button>
+          <Button type="submit" size="icon" disabled={!input.trim() || isLoading} className="h-12 w-12">
+            {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
+          </Button>
         </form>
-
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
+        <p className="text-xs text-muted-foreground mt-2 text-center">
           Press Enter to send, Shift+Enter for new line
         </p>
       </div>

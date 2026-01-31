@@ -363,7 +363,7 @@ class ScanSanClient:
             params["property_type"] = property_type
         
         if self.use_api:
-            data = await self._request("GET", f"/area_codes/{area_code}/rent/listings", params)
+            data = await self._request("GET", f"/v1/area_codes/{area_code}/rent/listings", params)
             if data:
                 return data
         
@@ -377,6 +377,62 @@ class ScanSanClient:
                 "avg_rent": summary["avg_rent"],
                 "min_rent": summary["min_rent"],
                 "max_rent": summary["max_rent"],
+            },
+        }
+    
+    async def get_sale_listings(
+        self,
+        area_code: str,
+        min_beds: Optional[int] = None,
+        max_beds: Optional[int] = None,
+        property_type: Optional[str] = None,
+    ) -> dict:
+        """Get sale listings for area code."""
+        params = {}
+        if min_beds:
+            params["min_beds"] = min_beds
+        if max_beds:
+            params["max_beds"] = max_beds
+        if property_type:
+            params["property_type"] = property_type
+        
+        if self.use_api:
+            data = await self._request("GET", f"/v1/area_codes/{area_code}/sale/listings", params)
+            if data:
+                return data
+        
+        # Return mock sale listings
+        return {
+            "area_code": area_code,
+            "listings": [
+                {
+                    "id": "1",
+                    "title": f"Modern 2 Bed Apartment in {area_code}",
+                    "price": 450000,
+                    "type": "sale",
+                    "location": f"{area_code}, London",
+                    "beds": 2,
+                    "baths": 1,
+                    "sqft": 850,
+                    "url": "https://rightmove.co.uk/property-1",
+                },
+                {
+                    "id": "2",
+                    "title": f"Luxury 3 Bed Flat in {area_code}",
+                    "price": 675000,
+                    "type": "sale",
+                    "location": f"{area_code}, London",
+                    "beds": 3,
+                    "baths": 2,
+                    "sqft": 1200,
+                    "url": "https://rightmove.co.uk/property-2",
+                },
+            ],
+            "stats": {
+                "median_price": 550000,
+                "avg_price": 575000,
+                "min_price": 350000,
+                "max_price": 850000,
             },
         }
     

@@ -335,6 +335,62 @@ async def chat_stream_endpoint(request: ChatRequest):
     )
 
 
+# =============================================================================
+# Property Listings API Endpoints
+# =============================================================================
+
+@app.post("/api/properties/listings")
+async def get_property_listings(request: dict):
+    """
+    Get property listings for an area.
+    
+    Request body:
+    - area_code: Area code (e.g., "NW1")
+    - listing_type: "rent" or "sale"
+    - min_beds: Optional minimum bedrooms
+    - max_beds: Optional maximum bedrooms
+    - property_type: Optional property type filter
+    """
+    try:
+        area_code = request.get("area_code")
+        listing_type = request.get("listing_type", "rent")
+        min_beds = request.get("min_beds")
+        max_beds = request.get("max_beds")
+        property_type = request.get("property_type")
+        
+        if not area_code:
+            raise HTTPException(status_code=400, detail="area_code is required")
+        
+        scansan_client = get_scansan_client()
+        
+        if listing_type == "sale":
+            data = await scansan_client.get_sale_listings(
+                area_code=area_code,
+                min_beds=min_beds,
+                max_beds=max_beds,
+                property_type=property_type,
+            )
+        else:
+            data = await scansan_client.get_rent_listings(
+                area_code=area_code,
+                min_beds=min_beds,
+                max_beds=max_beds,
+                property_type=property_type,
+            )
+        
+        return {
+            "success": True,
+            "area_code": area_code,
+            "listing_type": listing_type,
+            "data": data,
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

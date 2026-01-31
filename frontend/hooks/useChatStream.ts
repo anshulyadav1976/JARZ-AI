@@ -254,9 +254,10 @@ export function useChatStream(): UseChatStreamResult {
             const lines = buffer.split("\n");
             buffer = lines.pop() || "";
 
+            let currentEvent = "";
             for (const line of lines) {
               if (line.startsWith("event: ")) {
-                // Event type line - handled by data line
+                currentEvent = line.slice(7).trim();
                 continue;
               }
 
@@ -265,50 +266,52 @@ export function useChatStream(): UseChatStreamResult {
                 try {
                   const data = JSON.parse(jsonStr);
 
-                  // Handle different event types
-                  if (data.content !== undefined) {
+                  // Handle different event types based on event name
+                  if (currentEvent === "text" && data.content !== undefined) {
                     // Text content
                     accumulatedContent += data.content;
                     setState((prev) => ({
                       ...prev,
                       streamingContent: accumulatedContent,
                     }));
-                  } else if (data.tool !== undefined) {
-                    // Tool event
-                    if (data.arguments !== undefined) {
-                      // Tool start
-                      setState((prev) => ({
-                        ...prev,
-                        currentTool: { name: data.tool, isRunning: true },
-                      }));
-                    } else if (data.success !== undefined) {
-                      // Tool end
-                      setState((prev) => ({
-                        ...prev,
-                        currentTool: { name: data.tool, isRunning: false },
-                      }));
-                    }
-                  } else if (data.surfaceUpdate || data.dataModelUpdate || data.beginRendering) {
+                  } else if (currentEvent === "tool_start" && data.tool !== undefined) {
+                    // Tool start
+                    setState((prev) => ({
+                      ...prev,
+                      currentTool: { name: data.tool, isRunning: true },
+                    }));
+                  } else if (currentEvent === "tool_end" && data.tool !== undefined) {
+                    // Tool end
+                    setState((prev) => ({
+                      ...prev,
+                      currentTool: { name: data.tool, isRunning: false },
+                    }));
+                  } else if (currentEvent === "a2ui") {
                     // A2UI message
                     hasReceivedA2UI = true;
                     processA2UIMessage(data);
-                  } else if (data.error) {
+                  } else if (currentEvent === "error" && data.error) {
                     // Error
                     setState((prev) => ({
                       ...prev,
                       error: data.error,
                       isLoading: false,
                     }));
-                  } else if (data.status === "complete") {
+                  } else if (currentEvent === "complete") {
                     // Complete
                     setState((prev) => ({
                       ...prev,
                       isLoading: false,
                       currentTool: null,
                     }));
+                  } else if (currentEvent === "status") {
+                    // Status update - can add visual feedback here if needed
+                    console.log("Agent status:", data);
                   }
+
+                  currentEvent = "";
                 } catch (e) {
-                  console.error("Failed to parse SSE data:", e);
+                  console.error("Failed to parse SSE data:", e, "Line:", jsonStr);
                 }
               }
             }
