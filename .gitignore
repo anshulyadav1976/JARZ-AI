@@ -1,56 +1,212 @@
-/frontend/node_modules
-/frontend/.next/
-/backend/.env/
-/backend/.env.*
-/backend/env.txt
-/backend/.env
-/backend/.env.*
-/backend/env.txt
-/backend/.env
-/backend/.env.*
-/backend/env.txt
-/backend/.env
-/backend/env
-env.txt
-/.env
-/.env.*
-/JARZ-AI/.env
-/JARZ-AI/.env.*
-/JARZ-AI/env.txt
-/JARZ-AI/.env
-/JARZ-AI/.env.*
-/JARZ-AI/env.txt
-/JARZ-AI/.env
-/JARZ-AI/.env.*
-/JARZ-AI/env.txt
-/JARZ-AI/env.txt    
-/JARZ-AI/env.txt    
-wordlist.txt 
-no matching environment variables found.txt
-/JARZ-AI/data
-/JARZ-AI/data/raw
-/JARZ-AI/data/raw/district_training_data.parquet
-/JARZ-AI/data/raw/district_growth_timeseries.parquet
-/JARZ-AI/data/raw/district_training_data.parquet    
-/JARZ-AI/data/raw/district_growth_timeseries.parquet
-/JARZ-AI/data/raw/district_training_data.parquet    
-/JARZ-AI/data/raw/district_growth_timeseries.parquet    
-omg my brain is fried.txt
-/venv/
-/venv/bin/
-/venv/bin/activate
-/venv/bin/deactivate
-/venv/bin/pip
-/venv/bin/pip-compile
-/venv/bin/pip-sync
-/venv/bin/pip-uninstall
-/venv/bin/pip-install
-/venv/bin/pip-upgrade
-/venv/bin/pip-show
-/venv/bin/pip-list
-/backend/venv/
-venv
+# ==========================================
+# JARZ-AI Project .gitignore
+# ==========================================
 
-# Python caches
+# ============ Environment Variables ============
+.env
+.env.*
+!.env.example
+env.txt
+backend/.env
+backend/.env.*
+backend/env.txt
+backend/env
+frontend/.env.local
+frontend/.env.*.local
+models/.env
+JARZ-AI/.env*
+*.env.local
+
+# ============ Python ============
+# Byte-compiled / optimized
+__pycache__/
 **/__pycache__/
-**/*.pyc
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+backend/venv/
+backend/.venv/
+models/venv/
+JARZ-AI/venv/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# ============ Node.js / Frontend ============
+node_modules/
+frontend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+frontend/.next/
+frontend/out/
+frontend/build/
+.vercel
+
+# ============ Machine Learning / Data ============
+# Model files
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.joblib
+*.pth
+*.onnx
+*.pb
+*.tflite
+*.pt
+models/model-files/
+models/checkpoints/
+models/logs/
+
+# Data files
+*.parquet
+*.csv
+!**/example*.csv
+*.json.gz
+*.feather
+models/data/
+models/data/raw/
+models/data/processed/
+JARZ-AI/data/
+JARZ-AI/data/raw/
+JARZ-AI/data/processed/
+
+# ============ IDE & Editors ============
+# VS Code
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# PyCharm / JetBrains
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+\#*\#
+.emacs.desktop
+.emacs.desktop.lock
+*.elc
+
+# ============ Operating Systems ============
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+.nfs*
+
+# ============ Logs & Temporary Files ============
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tmp
+*.temp
+*.bak
+.cache/
+tmp/
+temp/
+
+# ============ Databases ============
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# ============ Miscellaneous ============
+wordlist.txt
+no matching environment variables found.txt
+omg my brain is fried.txt
+*.txt
+!requirements.txt
+!README.txt
+!LICENSE.txt
+!CHANGELOG.txt
+
+# ============ Git ============
+*.orig
+*.rej
+.git-rewrite/
+
+# ============ Testing ============
+.hypothesis/
+test-results/
+playwright-report/
