@@ -14,7 +14,6 @@ import { BarChart3, Home as HomeIcon, User, TrendingUp, Home as Building, List, 
 export default function Home() {
   const { state, sendMessage, reset } = useChatStream();
   const { state: propertyState, fetchListings } = usePropertyListings();
-  const [showA2UIPanel, setShowA2UIPanel] = useState(true);
   const [activeTab, setActiveTab] = useState("home");
   const [sidebarMode, setSidebarMode] = useState<"rent-analysis" | "buying-selling">("rent-analysis");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
@@ -39,7 +38,7 @@ export default function Home() {
   const hasA2UIContent = state.a2uiState.isReady && state.a2uiState.rootId;
 
   return (
-    <main className="h-screen w-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/20">
+    <main className="h-screen w-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/20 overflow-hidden">
       <header className="flex-shrink-0 border-b bg-card/80 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60">
         <div className="w-full flex h-16 items-center justify-between px-6 max-w-full">
           <div className="flex items-center gap-3">
@@ -75,49 +74,53 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden w-full">
-        {/* Sidebar */}
-        <div className="w-20 flex-shrink-0 border-r bg-card/50 flex flex-col items-center py-4 gap-3">
-          <Button
-            variant={sidebarMode === "rent-analysis" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setSidebarMode("rent-analysis")}
-            className="w-12 h-12"
-            title="Rent Analysis"
-          >
-            <TrendingUp className="h-5 w-5" />
-          </Button>
-          <Button
-            variant={sidebarMode === "buying-selling" ? "secondary" : "ghost"}
-            size="icon"
-            onClick={() => setSidebarMode("buying-selling")}
-            className="w-12 h-12"
-            title="Buying & Selling"
-          >
-            <Building className="h-5 w-5" />
-          </Button>
-        </div>
+      <div className="flex-1 flex overflow-hidden w-full min-h-0">
+        {/* Sidebar - only show after user sends first message */}
+        {state.messages.length > 0 && (
+          <div className="w-12 flex-shrink-0 border-r bg-card/50 flex flex-col items-center justify-start py-2 gap-2">
+            <Button
+              variant={sidebarMode === "rent-analysis" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setSidebarMode("rent-analysis")}
+              className="w-8 h-8"
+              title="Rent Analysis"
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant={sidebarMode === "buying-selling" ? "secondary" : "ghost"}
+              size="icon"
+              onClick={() => setSidebarMode("buying-selling")}
+              className="w-8 h-8"
+              title="Buying & Selling"
+            >
+              <Building className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
 
         {/* Chat Panel */}
-        <div className={`flex-shrink-0 border-r transition-all duration-300 ${showA2UIPanel && (hasA2UIContent || sidebarMode === "buying-selling") ? "w-full md:w-1/2 lg:w-2/5" : "w-full"}`}>
+        <div className={`flex-shrink-0 border-r transition-all duration-300 ${hasA2UIContent || sidebarMode === "buying-selling" ? "w-full md:w-[45%] lg:w-[38%]" : "w-full"}`}>
           <ChatPanel
             messages={state.messages}
             onSendMessage={handleSendMessage}
             isLoading={state.isLoading}
             currentTool={state.currentTool}
             streamingContent={state.streamingContent}
-            onTogglePanel={() => setShowA2UIPanel(!showA2UIPanel)}
-            showPanel={showA2UIPanel}
           />
         </div>
 
         {/* Insights/Property Panel */}
-        {showA2UIPanel && (
+        {(
           <div className={`flex-1 overflow-hidden transition-all duration-300 ${hasA2UIContent || sidebarMode === "buying-selling" ? "block" : "hidden md:block"}`}>
             {sidebarMode === "rent-analysis" ? (
-              <div className="h-full overflow-y-auto bg-muted/30">
+              <div className="h-full overflow-y-auto bg-gradient-to-br from-background via-muted/10 to-muted/20">
                 {hasA2UIContent ? (
-                  <div className="p-6 space-y-4">
+                  <div className="p-6 space-y-6">
+                    <div className="mb-4">
+                      <h2 className="text-2xl font-bold text-foreground mb-1">Market Insights</h2>
+                      <p className="text-sm text-muted-foreground">AI-powered rental market analysis</p>
+                    </div>
                     <A2UIRenderer state={state.a2uiState} />
                   </div>
                 ) : (

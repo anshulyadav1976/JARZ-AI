@@ -94,10 +94,13 @@ export function RentForecastChart({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-        Rent Forecast Timeline
-      </h3>
+    <div className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-center gap-2 mb-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+          <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
+          Timeline Forecast
+        </div>
+      </div>
       <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
         Historical data and {forecast.length - 1} month forecast with confidence band
       </div>

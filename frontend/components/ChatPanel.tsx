@@ -13,8 +13,6 @@ interface ChatPanelProps {
   isLoading: boolean;
   currentTool?: { name: string; isRunning: boolean } | null;
   streamingContent?: string;
-  onTogglePanel: () => void;
-  showPanel: boolean;
 }
 
 export function ChatPanel({
@@ -23,8 +21,6 @@ export function ChatPanel({
   isLoading,
   currentTool,
   streamingContent,
-  onTogglePanel,
-  showPanel,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -72,21 +68,7 @@ export function ChatPanel({
 
   return (
     <div className="flex flex-col h-full bg-background">
-      <div className="flex-shrink-0 px-6 py-4">
-        <div className="flex items-center justify-end">
-          <Button
-            variant={showPanel ? "default" : "outline"}
-            size="sm"
-            onClick={onTogglePanel}
-            className="gap-2"
-          >
-            {showPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRight className="h-4 w-4" />}
-            <span className="hidden sm:inline">{showPanel ? "Hide" : "Show"} Insights</span>
-          </Button>
-        </div>
-      </div>
-      
-      <ScrollArea className="flex-1 px-6 pt-6">
+      <ScrollArea className="flex-1 px-6 pt-4">
         {displayMessages.length === 0 && (
           <div className="text-center py-12">
             <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-blue-600/20 to-purple-600/20 rounded-full flex items-center justify-center">
@@ -126,7 +108,7 @@ export function ChatPanel({
       </ScrollArea>
 
       <div className="flex-shrink-0 border-t px-6 py-4">
-        <form onSubmit={handleSubmit} className="flex gap-2">
+        <form onSubmit={handleSubmit} className="flex gap-2 max-w-4xl mx-auto w-full">
           <textarea
             ref={inputRef}
             value={input}
@@ -135,10 +117,10 @@ export function ChatPanel({
             placeholder="Ask about rental valuations..."
             disabled={isLoading}
             rows={1}
-            className="flex-1 px-4 py-3 rounded-lg border bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            className="flex-1 min-w-0 px-4 py-3 rounded-lg border bg-background resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             style={{ minHeight: "48px", maxHeight: "120px" }}
           />
-          <Button type="submit" size="icon" disabled={!input.trim() || isLoading} className="h-12 w-12">
+          <Button type="submit" size="icon" disabled={!input.trim() || isLoading} className="h-12 w-12 flex-shrink-0">
             {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
           </Button>
         </form>

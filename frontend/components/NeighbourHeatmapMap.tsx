@@ -55,16 +55,19 @@ export function NeighbourHeatmapMap({
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg flex-1 min-w-[300px]">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        Neighboring Areas
-      </h3>
-      <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        Spatial context with {neighbors.length} nearby areas
+    <div className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow flex-1 min-w-[300px] flex flex-col">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+          <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
+          Neighboring Areas
+        </div>
       </div>
+      <p className="text-sm text-muted-foreground mb-6">
+        Spatial context with {neighbors.length} nearby areas
+      </p>
 
       {/* SVG Map */}
-      <div className="relative aspect-square bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden">
+      <div className="relative aspect-square bg-muted/50 rounded-lg overflow-hidden border border-border flex-shrink-0">
         <svg viewBox="0 0 100 100" className="w-full h-full">
           {/* Grid lines */}
           <defs>
@@ -154,40 +157,40 @@ export function NeighbourHeatmapMap({
       </div>
 
       {/* Legend */}
-      <div className="mt-4 flex items-center justify-between text-xs">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-            <span className="text-gray-600 dark:text-gray-400">Selected</span>
+      <div className="mt-4 p-3 bg-muted/30 rounded-lg flex-shrink-0">
+        <div className="flex items-center justify-around text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-primary shadow-sm"></div>
+            <span className="text-muted-foreground font-medium">Selected</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-            <span className="text-gray-600 dark:text-gray-400">High Demand</span>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500 shadow-sm"></div>
+            <span className="text-muted-foreground font-medium">High Demand</span>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-            <span className="text-gray-600 dark:text-gray-400">Lower Demand</span>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-green-500 shadow-sm"></div>
+            <span className="text-muted-foreground font-medium">Lower Demand</span>
           </div>
         </div>
       </div>
 
-      {/* Neighbor list */}
-      <div className="mt-4 space-y-2 max-h-40 overflow-y-auto">
+      {/* Neighbor list - takes remaining height */}
+      <div className="mt-4 space-y-2 flex-1 overflow-y-auto min-h-0">
         {neighbors.map((neighbor, i) => (
           <div
             key={i}
-            className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-700 rounded text-sm"
+            className="flex items-center justify-between p-3 bg-muted/50 hover:bg-muted/70 rounded-lg border border-border transition-colors"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div
-                className="w-2 h-2 rounded-full"
+                className="w-2.5 h-2.5 rounded-full shadow-sm"
                 style={{ backgroundColor: getColor(neighbor) }}
               ></div>
-              <span className="font-medium text-gray-700 dark:text-gray-300">
+              <span className="font-medium text-foreground text-sm">
                 {neighbor.area_code}
               </span>
             </div>
-            <span className="text-gray-500 dark:text-gray-400">
+            <span className="text-muted-foreground font-semibold text-sm">
               {formatCurrency(neighbor.avg_rent)}
             </span>
           </div>

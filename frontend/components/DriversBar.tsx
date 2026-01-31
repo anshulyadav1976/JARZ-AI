@@ -21,22 +21,25 @@ export function DriversBar({ drivers, base_value }: DriversBarProps) {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-lg flex-1 min-w-[300px]">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-        Prediction Drivers
-      </h3>
-      <div className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        Top factors influencing the rent forecast
+    <div className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow flex-1 min-w-[300px]">
+      <div className="flex items-center gap-2 mb-6">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+          <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
+          Key Drivers
+        </div>
       </div>
+      <p className="text-sm text-muted-foreground mb-6">
+        Top factors influencing the rent forecast
+      </p>
 
       {/* Base value indicator */}
       {base_value && (
-        <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-700 rounded-lg">
+        <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <span className="text-sm font-medium text-muted-foreground">
               Base Rent
             </span>
-            <span className="font-semibold text-gray-900 dark:text-white">
+            <span className="text-lg font-bold text-foreground">
               £{base_value.toLocaleString()}
             </span>
           </div>
@@ -50,16 +53,16 @@ export function DriversBar({ drivers, base_value }: DriversBarProps) {
           const barWidth = (Math.abs(driver.contribution) / maxContribution) * 100;
 
           return (
-            <div key={i} className="relative">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <div key={i} className="relative p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-foreground">
                   {driver.name}
                 </span>
                 <span
-                  className={`text-sm font-semibold ${
+                  className={`text-sm font-bold px-2 py-1 rounded ${
                     isPositive
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-red-600 dark:text-red-400"
+                      ? "text-green-600 dark:text-green-400 bg-green-500/10"
+                      : "text-red-600 dark:text-red-400 bg-red-500/10"
                   }`}
                 >
                   {formatValue(isPositive ? driver.contribution : -driver.contribution)}
@@ -67,16 +70,16 @@ export function DriversBar({ drivers, base_value }: DriversBarProps) {
               </div>
               
               {/* Bar container */}
-              <div className="relative h-4 bg-gray-100 dark:bg-gray-700 rounded overflow-hidden">
+              <div className="relative h-3 bg-muted rounded-full overflow-hidden">
                 {/* Center line for reference */}
-                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-gray-300 dark:bg-gray-600"></div>
+                <div className="absolute left-1/2 top-0 bottom-0 w-px bg-border"></div>
                 
                 {/* Bar */}
                 <div
-                  className={`absolute top-0 h-full rounded transition-all duration-500 ${
+                  className={`absolute top-0 h-full rounded-full transition-all duration-500 ${
                     isPositive
-                      ? "bg-gradient-to-r from-green-400 to-green-500"
-                      : "bg-gradient-to-l from-red-400 to-red-500"
+                      ? "bg-gradient-to-r from-green-500 to-green-600"
+                      : "bg-gradient-to-l from-red-500 to-red-600"
                   }`}
                   style={{
                     width: `${barWidth / 2}%`,
@@ -86,8 +89,8 @@ export function DriversBar({ drivers, base_value }: DriversBarProps) {
               </div>
 
               {/* Impact indicator */}
-              <div className="flex justify-center mt-1">
-                <span className="text-xs text-gray-400">
+              <div className="flex justify-center mt-1.5">
+                <span className="text-xs text-muted-foreground">
                   {isPositive ? "↑ Increases rent" : "↓ Decreases rent"}
                 </span>
               </div>

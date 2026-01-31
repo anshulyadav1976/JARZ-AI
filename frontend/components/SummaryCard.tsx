@@ -32,79 +32,81 @@ export function SummaryCard({
       : "text-red-600 dark:text-red-400";
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-700 rounded-xl p-6 shadow-lg">
-      <div className="flex items-start justify-between mb-4">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-600 dark:text-gray-300">
+    <div className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between mb-6">
+        <div className="flex-1">
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium mb-3">
+            <span className="w-1.5 h-1.5 bg-primary rounded-full"></span>
             Rental Forecast
-          </h2>
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
+          </div>
+          <h3 className="text-2xl font-bold text-foreground mb-1">
             {location}
           </h3>
-        </div>
-        <div className="text-right">
-          <span className="text-sm text-gray-500 dark:text-gray-400">
-            {horizon_months} month horizon
-          </span>
+          <p className="text-sm text-muted-foreground">
+            {horizon_months} month forecast horizon
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-3 gap-3 mb-6">
         {/* P10 - Lower bound */}
-        <div className="text-center p-4 bg-white/50 dark:bg-slate-600/50 rounded-lg">
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+        <div className="text-center p-4 bg-muted/50 rounded-lg border border-border hover:border-muted-foreground/20 transition-colors">
+          <div className="text-xs font-medium text-muted-foreground mb-2">
             Low (P10)
           </div>
-          <div className="text-xl font-bold text-gray-700 dark:text-gray-200">
+          <div className="text-lg font-bold text-foreground">
             {formatCurrency(p10)}
           </div>
         </div>
 
         {/* P50 - Median */}
-        <div className="text-center p-4 bg-blue-100 dark:bg-blue-900/50 rounded-lg border-2 border-blue-300 dark:border-blue-700">
-          <div className="text-sm text-blue-600 dark:text-blue-300 mb-1 font-medium">
+        <div className="text-center p-4 bg-primary/10 rounded-lg border-2 border-primary/30 shadow-sm">
+          <div className="text-xs font-semibold text-primary mb-2">
             Expected (P50)
           </div>
-          <div className="text-2xl font-bold text-blue-700 dark:text-blue-200">
+          <div className="text-2xl font-bold text-primary">
             {formatCurrency(p50)}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          <div className="text-xs text-muted-foreground mt-2">
             {unit}
           </div>
         </div>
 
         {/* P90 - Upper bound */}
-        <div className="text-center p-4 bg-white/50 dark:bg-slate-600/50 rounded-lg">
-          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+        <div className="text-center p-4 bg-muted/50 rounded-lg border border-border hover:border-muted-foreground/20 transition-colors">
+          <div className="text-xs font-medium text-muted-foreground mb-2">
             High (P90)
           </div>
-          <div className="text-xl font-bold text-gray-700 dark:text-gray-200">
+          <div className="text-lg font-bold text-foreground">
             {formatCurrency(p90)}
           </div>
         </div>
       </div>
 
       {/* Confidence indicator */}
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-sm text-gray-600 dark:text-gray-400">
+      <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg mb-4">
+        <span className="text-sm font-medium text-muted-foreground">
           Confidence Level
         </span>
-        <span className={`font-semibold ${confidenceColor}`}>
-          {confidenceLevel}
-        </span>
+        <div className="flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${confidenceColor.includes('green') ? 'bg-green-500' : confidenceColor.includes('yellow') ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+          <span className={`text-sm font-semibold ${confidenceColor}`}>
+            {confidenceLevel}
+          </span>
+        </div>
       </div>
 
       {/* Visual range bar */}
-      <div className="relative h-3 bg-gray-200 dark:bg-gray-600 rounded-full overflow-hidden mb-4">
+      <div className="relative h-4 bg-muted rounded-full overflow-hidden mb-6">
         <div
-          className="absolute h-full bg-gradient-to-r from-blue-300 via-blue-500 to-blue-300 rounded-full"
+          className="absolute h-full bg-gradient-to-r from-primary/30 via-primary/60 to-primary/30 rounded-full"
           style={{
             left: `${((p10 - p10) / (p90 - p10)) * 100}%`,
             right: `${100 - ((p90 - p10) / (p90 - p10)) * 100}%`,
           }}
         />
         <div
-          className="absolute h-full w-1 bg-blue-700 dark:bg-blue-300"
+          className="absolute h-full w-1 bg-primary shadow-md"
           style={{
             left: `${((p50 - p10) / (p90 - p10)) * 100}%`,
           }}
@@ -113,8 +115,8 @@ export function SummaryCard({
 
       {/* Takeaway */}
       {takeaway && (
-        <div className="mt-4 p-3 bg-white/70 dark:bg-slate-600/70 rounded-lg">
-          <p className="text-sm text-gray-700 dark:text-gray-300">{takeaway}</p>
+        <div className="p-4 bg-muted/50 rounded-lg border-l-4 border-primary">
+          <p className="text-sm text-foreground leading-relaxed">{takeaway}</p>
         </div>
       )}
     </div>
