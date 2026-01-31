@@ -1,4 +1,4 @@
-"""ScanSan API client with caching and fallback mock data."""
+"""ScanSan API client - Always uses real API, no mock fallback."""
 import asyncio
 import hashlib
 import time
@@ -39,210 +39,11 @@ def _set_cached(key: str, value: Any) -> None:
 
 
 # ============================================================================
-# Mock Data for Fallback
-# ============================================================================
-
-MOCK_AREA_CODES = {
-    "NW1": {
-        "area_code": "NW1",
-        "area_code_district": "Camden",
-        "display_name": "Camden Town, NW1",
-        "lat": 51.5390,
-        "lon": -0.1426,
-    },
-    "E14": {
-        "area_code": "E14",
-        "area_code_district": "Tower Hamlets",
-        "display_name": "Canary Wharf, E14",
-        "lat": 51.5054,
-        "lon": -0.0235,
-    },
-    "SW1": {
-        "area_code": "SW1",
-        "area_code_district": "Westminster",
-        "display_name": "Westminster, SW1",
-        "lat": 51.4975,
-        "lon": -0.1357,
-    },
-    "SE1": {
-        "area_code": "SE1",
-        "area_code_district": "Southwark",
-        "display_name": "Southwark, SE1",
-        "lat": 51.5030,
-        "lon": -0.0870,
-    },
-    "W1": {
-        "area_code": "W1",
-        "area_code_district": "Westminster",
-        "display_name": "West End, W1",
-        "lat": 51.5145,
-        "lon": -0.1445,
-    },
-    "EC1": {
-        "area_code": "EC1",
-        "area_code_district": "Islington",
-        "display_name": "Clerkenwell, EC1",
-        "lat": 51.5246,
-        "lon": -0.1020,
-    },
-    "N1": {
-        "area_code": "N1",
-        "area_code_district": "Islington",
-        "display_name": "Islington, N1",
-        "lat": 51.5362,
-        "lon": -0.1030,
-    },
-    "E1": {
-        "area_code": "E1",
-        "area_code_district": "Tower Hamlets",
-        "display_name": "Whitechapel, E1",
-        "lat": 51.5150,
-        "lon": -0.0553,
-    },
-}
-
-MOCK_AREA_SUMMARY = {
-    "NW1": {
-        "median_rent": 2200,
-        "avg_rent": 2350,
-        "min_rent": 1400,
-        "max_rent": 4500,
-        "listing_count": 245,
-        "property_types": {"flat": 180, "house": 45, "studio": 20},
-    },
-    "E14": {
-        "median_rent": 2400,
-        "avg_rent": 2600,
-        "min_rent": 1600,
-        "max_rent": 5000,
-        "listing_count": 320,
-        "property_types": {"flat": 280, "house": 20, "studio": 20},
-    },
-}
-
-MOCK_DEMAND = {
-    "Camden": {"demand_index": 78.5, "trend": "increasing", "yoy_change": 5.2},
-    "Tower Hamlets": {"demand_index": 82.3, "trend": "stable", "yoy_change": 2.1},
-    "Westminster": {"demand_index": 85.0, "trend": "increasing", "yoy_change": 6.8},
-    "Southwark": {"demand_index": 75.0, "trend": "increasing", "yoy_change": 4.5},
-    "Islington": {"demand_index": 80.0, "trend": "stable", "yoy_change": 3.0},
-}
-
-MOCK_GROWTH = {
-    "Camden": {
-        "mom_growth": 0.8,
-        "yoy_growth": 4.5,
-        "historical": [
-            {"period": "2025-01", "growth": 0.5},
-            {"period": "2025-02", "growth": 0.7},
-            {"period": "2025-03", "growth": 0.6},
-            {"period": "2025-04", "growth": 0.9},
-            {"period": "2025-05", "growth": 0.8},
-            {"period": "2025-06", "growth": 0.7},
-        ],
-    },
-    "Tower Hamlets": {
-        "mom_growth": 0.5,
-        "yoy_growth": 3.2,
-        "historical": [
-            {"period": "2025-01", "growth": 0.3},
-            {"period": "2025-02", "growth": 0.4},
-            {"period": "2025-03", "growth": 0.5},
-            {"period": "2025-04", "growth": 0.6},
-            {"period": "2025-05", "growth": 0.5},
-            {"period": "2025-06", "growth": 0.4},
-        ],
-    },
-}
-
-
-def _get_mock_area_code(query: str) -> Optional[dict]:
-    """Find area code from mock data."""
-    query_upper = query.upper().strip()
-    
-    # Direct match
-    if query_upper in MOCK_AREA_CODES:
-        return MOCK_AREA_CODES[query_upper]
-    
-    # Partial match
-    for code, data in MOCK_AREA_CODES.items():
-        if query_upper in code or query_upper in data["display_name"].upper():
-            return data
-        if query_upper in data["area_code_district"].upper():
-            return data
-    
-    # Default fallback to NW1
-    return MOCK_AREA_CODES["NW1"]
-
-
-def _get_mock_summary(area_code: str) -> dict:
-    """Get mock summary for area code."""
-    if area_code in MOCK_AREA_SUMMARY:
-        return MOCK_AREA_SUMMARY[area_code]
-    # Return default values
-    return {
-        "median_rent": 2000,
-        "avg_rent": 2150,
-        "min_rent": 1200,
-        "max_rent": 4000,
-        "listing_count": 150,
-        "property_types": {"flat": 120, "house": 20, "studio": 10},
-    }
-
-
-def _get_mock_demand(district: str) -> dict:
-    """Get mock demand for district."""
-    if district in MOCK_DEMAND:
-        return MOCK_DEMAND[district]
-    return {"demand_index": 75.0, "trend": "stable", "yoy_change": 3.0}
-
-
-def _get_mock_growth(district: str) -> dict:
-    """Get mock growth for district."""
-    if district in MOCK_GROWTH:
-        return MOCK_GROWTH[district]
-    return {
-        "mom_growth": 0.5,
-        "yoy_growth": 3.0,
-        "historical": [],
-    }
-
-
-def _get_mock_neighbors(area_code: str, k: int = 5) -> list[dict]:
-    """Get mock neighbors for area code."""
-    neighbors = []
-    current = MOCK_AREA_CODES.get(area_code)
-    if not current:
-        return []
-    
-    for code, data in MOCK_AREA_CODES.items():
-        if code == area_code:
-            continue
-        # Simple distance calculation
-        dlat = data["lat"] - current["lat"]
-        dlon = data["lon"] - current["lon"]
-        dist = (dlat**2 + dlon**2) ** 0.5 * 111  # Approximate km
-        neighbors.append({
-            "area_code": code,
-            "display_name": data["display_name"],
-            "lat": data["lat"],
-            "lon": data["lon"],
-            "distance_km": round(dist, 2),
-            "avg_rent": _get_mock_summary(code).get("avg_rent", 2000),
-            "demand_index": _get_mock_demand(data["area_code_district"]).get("demand_index", 75),
-        })
-    
-    # Sort by distance and return top k
-    neighbors.sort(key=lambda x: x["distance_km"])
-    return neighbors[:k]
-
-
-# ============================================================================
 # ScanSan Client Class
 # ============================================================================
 
 class ScanSanClient:
-    """Async client for ScanSan API with caching and fallback."""
+    """Async client for ScanSan API - Always uses real API."""
     
     def __init__(self):
         self.settings = get_settings()
@@ -257,8 +58,7 @@ class ScanSanClient:
             self._client = httpx.AsyncClient(
                 base_url=self.base_url,
                 headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
+                    "X-Auth-Token": self.api_key,
                 },
                 timeout=30.0,
             )
@@ -279,12 +79,14 @@ class ScanSanClient:
     ) -> Optional[dict]:
         """Make API request with retries."""
         if not self.use_api:
+            print(f"[SCANSAN] ERROR: API disabled. Set USE_SCANSAN=true in .env")
             return None
         
         # Check cache
         cache_key = _cache_key(endpoint, params=params)
         cached = _get_cached(cache_key)
         if cached is not None:
+            print(f"[SCANSAN] Cache hit for {endpoint}")
             return cached
         
         client = await self._get_client()
@@ -313,38 +115,53 @@ class ScanSanClient:
                 last_error = e
                 await asyncio.sleep(1)
         
-        print(f"ScanSan API error after {retries} attempts: {last_error}")
+        print(f"[SCANSAN] API error after {retries} attempts: {last_error}")
         return None
     
     async def search_area_codes(self, query: str) -> Optional[ResolvedLocation]:
         """Search for area codes matching query."""
-        # Try API first
-        if self.use_api:
-            data = await self._request("GET", "/area_codes/search", {"search_term": query})
-            if data and "results" in data and len(data["results"]) > 0:
-                result = data["results"][0]
+        print(f"[SCANSAN] GET /v1/area_codes/search?area_name={query}")
+        data = await self._request("GET", "/v1/area_codes/search", {"area_name": query})
+        
+        if data and "data" in data and len(data["data"]) > 0:
+            # data[0] is an array of area code objects
+            first_array = data["data"][0]
+            if isinstance(first_array, list) and len(first_array) > 0:
+                result = first_array[0]
+                area_code_data = result.get("area_code", {})
+                district = area_code_data.get("area_code_district", "")
+                area_code_list = area_code_data.get("area_code_list", [])
+                first_area_code = area_code_list[0] if area_code_list else query.upper()
+                
+                ward = result.get("ward", [])
+                ward_name = ward[0] if ward else query
+                
+                print(f"[SCANSAN] Found area: {ward_name} - District: {district}, First code: {first_area_code}")
+                
                 return ResolvedLocation(
-                    area_code=result.get("area_code", query.upper()),
-                    area_code_district=result.get("district"),
-                    display_name=result.get("display_name", query),
-                    lat=result.get("lat"),
-                    lon=result.get("lon"),
+                    area_code=district,  # Use district (e.g., UB8) as the area code
+                    area_code_district=district,
+                    display_name=f"{ward_name}, {district}",
+                    lat=None,
+                    lon=None,
                 )
         
-        # Fallback to mock data
-        mock = _get_mock_area_code(query)
-        if mock:
-            return ResolvedLocation(**mock)
+        print(f"[SCANSAN] No results found for: {query}")
+        print(f"[SCANSAN] Response: {data}")
         return None
     
-    async def get_area_summary(self, area_code: str) -> dict:
+    async def get_area_summary(self, area_code: str) -> Optional[dict]:
         """Get summary statistics for area code."""
-        if self.use_api:
-            data = await self._request("GET", f"/area_codes/{area_code}/summary")
-            if data:
-                return data
+        print(f"[SCANSAN] GET /v1/area_codes/{area_code}/summary")
+        data = await self._request("GET", f"/v1/area_codes/{area_code}/summary")
         
-        return _get_mock_summary(area_code)
+        if data and "data" in data:
+            print(f"[SCANSAN] Summary data found for {area_code}")
+            print(f"[SCANSAN] Summary: {data['data']}")
+            return data
+        
+        print(f"[SCANSAN] No summary data found for {area_code}")
+        return None
     
     async def get_rent_listings(
         self,
@@ -352,7 +169,7 @@ class ScanSanClient:
         min_beds: Optional[int] = None,
         max_beds: Optional[int] = None,
         property_type: Optional[str] = None,
-    ) -> dict:
+    ) -> Optional[dict]:
         """Get rent listings for area code."""
         params = {}
         if min_beds:
@@ -362,23 +179,16 @@ class ScanSanClient:
         if property_type:
             params["property_type"] = property_type
         
-        if self.use_api:
-            data = await self._request("GET", f"/v1/area_codes/{area_code}/rent/listings", params)
-            if data:
-                return data
+        print(f"[SCANSAN] GET /v1/area_codes/{area_code}/rent/listings")
+        data = await self._request("GET", f"/v1/area_codes/{area_code}/rent/listings", params)
         
-        # Return mock listings summary
-        summary = _get_mock_summary(area_code)
-        return {
-            "area_code": area_code,
-            "listings_count": summary["listing_count"],
-            "stats": {
-                "median_rent": summary["median_rent"],
-                "avg_rent": summary["avg_rent"],
-                "min_rent": summary["min_rent"],
-                "max_rent": summary["max_rent"],
-            },
-        }
+        if data and "data" in data:
+            listings = data["data"].get("rent_listings", [])
+            print(f"[SCANSAN] Rent listings found for {area_code}: {len(listings)} listings")
+            return data
+        
+        print(f"[SCANSAN] No rent listings found for {area_code}")
+        return None
     
     async def get_sale_listings(
         self,
@@ -386,7 +196,7 @@ class ScanSanClient:
         min_beds: Optional[int] = None,
         max_beds: Optional[int] = None,
         property_type: Optional[str] = None,
-    ) -> dict:
+    ) -> Optional[dict]:
         """Get sale listings for area code."""
         params = {}
         if min_beds:
@@ -396,71 +206,51 @@ class ScanSanClient:
         if property_type:
             params["property_type"] = property_type
         
-        if self.use_api:
-            data = await self._request("GET", f"/v1/area_codes/{area_code}/sale/listings", params)
-            if data:
-                return data
+        print(f"[SCANSAN] GET /v1/area_codes/{area_code}/sale/listings")
+        data = await self._request("GET", f"/v1/area_codes/{area_code}/sale/listings", params)
         
-        # Return mock sale listings
-        return {
-            "area_code": area_code,
-            "listings": [
-                {
-                    "id": "1",
-                    "title": f"Modern 2 Bed Apartment in {area_code}",
-                    "price": 450000,
-                    "type": "sale",
-                    "location": f"{area_code}, London",
-                    "beds": 2,
-                    "baths": 1,
-                    "sqft": 850,
-                    "url": "https://rightmove.co.uk/property-1",
-                },
-                {
-                    "id": "2",
-                    "title": f"Luxury 3 Bed Flat in {area_code}",
-                    "price": 675000,
-                    "type": "sale",
-                    "location": f"{area_code}, London",
-                    "beds": 3,
-                    "baths": 2,
-                    "sqft": 1200,
-                    "url": "https://rightmove.co.uk/property-2",
-                },
-            ],
-            "stats": {
-                "median_price": 550000,
-                "avg_price": 575000,
-                "min_price": 350000,
-                "max_price": 850000,
-            },
-        }
+        if data and "data" in data:
+            listings = data["data"].get("sale_listings", [])
+            print(f"[SCANSAN] Sale listings found for {area_code}: {len(listings)} listings")
+            return data
+        
+        print(f"[SCANSAN] No sale listings found for {area_code}")
+        return None
     
     async def get_district_demand(
         self,
         district: str,
         period: Optional[str] = None,
-    ) -> dict:
+    ) -> Optional[dict]:
         """Get demand data for district."""
         params = {}
         if period:
             params["period"] = period
         
-        if self.use_api:
-            data = await self._request("GET", f"/district/{district}/rent/demand", params)
-            if data:
-                return data
+        print(f"[SCANSAN] GET /v1/district/{district}/rent/demand")
+        data = await self._request("GET", f"/v1/district/{district}/rent/demand", params)
         
-        return _get_mock_demand(district)
+        if data and "data" in data:
+            print(f"[SCANSAN] Demand data found for {district}")
+            print(f"[SCANSAN] Demand info: {data.get('data', {}).get('rental_demand', [])}")
+            return data
+        
+        print(f"[SCANSAN] No demand data found for {district}")
+        return None
     
-    async def get_district_growth(self, district: str) -> dict:
+    async def get_district_growth(self, district: str) -> Optional[dict]:
         """Get growth data for district."""
-        if self.use_api:
-            data = await self._request("GET", f"/district/{district}/growth")
-            if data:
-                return data
+        print(f"[SCANSAN] GET /v1/district/{district}/growth")
+        data = await self._request("GET", f"/v1/district/{district}/growth")
         
-        return _get_mock_growth(district)
+        if data and "data" in data:
+            print(f"[SCANSAN] Growth data found for {district}")
+            monthly = data.get('data', {}).get('monthly_data', [])
+            print(f"[SCANSAN] Growth: {len(monthly)} months of data")
+            return data
+        
+        print(f"[SCANSAN] No growth data found for {district}")
+        return None
     
     async def get_neighbors(
         self,
@@ -468,18 +258,72 @@ class ScanSanClient:
         k: int = 5,
         radius_km: Optional[float] = None,
     ) -> list[Neighbor]:
-        """Get neighboring areas."""
-        if self.use_api:
-            params = {"k": k}
-            if radius_km:
-                params["radius_km"] = radius_km
-            data = await self._request("GET", f"/area_codes/{area_code}/neighbors", params)
-            if data and "neighbors" in data:
-                return [Neighbor(**n) for n in data["neighbors"]]
+        """Get neighboring areas.
         
-        # Fallback to mock
-        mock_neighbors = _get_mock_neighbors(area_code, k)
-        return [Neighbor(**n) for n in mock_neighbors]
+        Note: ScanSan API doesn't have a dedicated neighbors endpoint.
+        This method returns an empty list.
+        """
+        print(f"[SCANSAN] WARNING: neighbors endpoint not available in ScanSan API")
+        print(f"[SCANSAN] Returning empty neighbors list for {area_code}")
+        return []
+    
+    async def get_postcode_addresses(self, postcode: str) -> Optional[dict]:
+        """Get addresses for a postcode."""
+        # Clean postcode (remove spaces)
+        clean_postcode = postcode.replace(" ", "").upper()
+        print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/addresses")
+        data = await self._request("GET", f"/v1/postcode/{clean_postcode}/addresses")
+        
+        if data and "data" in data and len(data["data"]) > 0:
+            print(f"[SCANSAN] Found {len(data['data'])} addresses")
+            return data
+        
+        print(f"[SCANSAN] No addresses found for {postcode}")
+        return None
+    
+    async def get_property_energy_performance(self, uprn: str) -> Optional[dict]:
+        """Get energy performance data for a property by UPRN."""
+        print(f"[SCANSAN] GET /v1/property/{uprn}/energy/performance")
+        data = await self._request("GET", f"/v1/property/{uprn}/energy/performance")
+        
+        if data and "data" in data and len(data["data"]) > 0:
+            # Return first property data
+            print(f"[SCANSAN] Energy performance data found")
+            print(f"[SCANSAN] Energy data: {data}")
+            return data["data"][0]
+        
+        print(f"[SCANSAN] No energy performance data found")
+        return None
+    
+    async def get_postcode_energy_performance(self, postcode: str) -> Optional[dict]:
+        """Get energy performance data for a postcode (returns first property)."""
+        # Clean postcode (remove spaces)
+        clean_postcode = postcode.replace(" ", "").upper()
+        print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/energy/performance")
+        data = await self._request("GET", f"/v1/postcode/{clean_postcode}/energy/performance")
+        
+        if data and "data" in data and len(data["data"]) > 0:
+            # Return first property data
+            print(f"[SCANSAN] Energy performance data found ({len(data['data'])} properties)")
+            print(f"[SCANSAN] Energy data: {data['data'][0]}")
+            return data["data"][0]
+        
+        print(f"[SCANSAN] No energy performance data found")
+        return None
+    
+    async def get_uprn_from_postcode(self, postcode: str) -> Optional[str]:
+        """Get UPRN from postcode by fetching addresses."""
+        print(f"[SCANSAN] Looking up UPRN for postcode: {postcode}")
+        addresses_data = await self.get_postcode_addresses(postcode)
+        
+        if addresses_data and "data" in addresses_data and len(addresses_data["data"]) > 0:
+            # Return first address UPRN
+            uprn = str(addresses_data["data"][0].get("uprn"))
+            print(f"[SCANSAN] Using first address UPRN: {uprn}")
+            return uprn
+        
+        print(f"[SCANSAN] No UPRN found for postcode: {postcode}")
+        return None
 
 
 # Singleton client
