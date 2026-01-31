@@ -666,11 +666,13 @@ if __name__ == "__main__":
     all_districts = get_all_uk_districts()
     print(f"\nTotal UK districts to fetch: {len(all_districts)}")
     
-    # For initial testing, limit to a subset
-    # Set limit=None for full collection (will take ~1 hour)
-    LIMIT = 10  # =========================================================================================================
+    # Full data collection - all UK districts (~1 hour, ~2000+ districts)
+    LIMIT = None  # NO LIMITS - COLLECTING ALL DATA
     
-    print(f"Fetching first {LIMIT} districts (set LIMIT=None for full collection)")
+    if LIMIT:
+        print(f"Fetching first {LIMIT} districts")
+    else:
+        print(f"Fetching ALL {len(all_districts)} districts - FULL DATASET MODE 🚀")
     
     # Collect data
     df_features, df_timeseries = collect_district_training_data(

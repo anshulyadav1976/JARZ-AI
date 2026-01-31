@@ -181,16 +181,31 @@ def add_temporal_features(df: pd.DataFrame, df_ts: pd.DataFrame) -> pd.DataFrame
 
 
 def prepare_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, list]:
-    """Prepare feature matrix, handling missing values."""
+    """Prepare feature matrix with advanced feature engineering."""
     print("Preparing feature matrix...")
     exclude = {"district", "area_code_type", "error", TARGET_COL, FALLBACK_TARGET, "lat", "lon", "region"}
     
     cols = [c for c in df.columns if c not in exclude and df[c].dtype in ["float64", "int64", "float32", "int32"]]
     X = df[cols].copy()
     
+    # Add derived features for better predictions
+    if "rent_pcm_max" in X.columns and "rent_pcm_min" in X.columns:
+        X["rent_price_spread"] = X["rent_pcm_max"] - X["rent_pcm_min"]
+    if "sale_demand_mean_price" in X.columns and "rent_demand_mean_pcm" in X.columns:
+        X["rental_yield_estimate"] = (X["rent_demand_mean_pcm"] * 12) / X["sale_demand_mean_price"].replace(0, np.nan) * 100
+    if "current_rent_listings" in X.columns and "total_properties" in X.columns:
+        X["rent_supply_ratio"] = X["current_rent_listings"] / X["total_properties"].replace(0, np.nan) * 100
+    
+    # Fill missing values with median (more robust than mean)
     for col in X.columns:
         if X[col].isna().any():
             X[col] = X[col].fillna(X[col].median() if not pd.isna(X[col].median()) else 0)
+    
+    # Cap extreme outliers (beyond 99.5th percentile)
+    for col in X.columns:
+        if X[col].std() > 0:
+            upper = X[col].quantile(0.995)
+            X[col] = X[col].clip(upper=upper)
     
     print(f"  Feature matrix: {X.shape[0]} × {X.shape[1]}")
     return X, cols
@@ -198,10 +213,21 @@ def prepare_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, list]:
 
 # ============ SYNTHETIC DATA GENERATION ============
 def generate_synthetic_data(X: pd.DataFrame, y: pd.Series, n: int = 100) -> Tuple[pd.DataFrame, pd.Series]:
-    """Generate synthetic training data when API data is sparse."""
+    """Generate synthetic training data with realistic feature correlations."""
     np.random.seed(42)
     profiles = list(RENTAL_PROFILES.keys())
     weights = [0.1, 0.25, 0.3, 0.2, 0.15]
+    
+    # Learn correlations from real data if available
+    valid = y.notna() & (y > 0)
+    if valid.sum() > 0:
+        real_X = X[valid]
+        real_y = y[valid]
+        # Calculate mean ratios from real data
+        rent_to_sale_ratio = (real_y / real_X["sale_demand_mean_price"]).median() if "sale_demand_mean_price" in real_X.columns and real_X["sale_demand_mean_price"].notna().sum() > 0 else 0.05
+        rent_range_ratio = (real_X["rent_pcm_max"] / real_X["rent_pcm_min"]).median() if "rent_pcm_min" in real_X.columns and (real_X["rent_pcm_min"] > 0).sum() > 0 else 2.0
+    else:
+        rent_to_sale_ratio, rent_range_ratio = 0.05, 2.0
     
     synthetic_X, synthetic_y = [], []
     for _ in range(n):
@@ -209,23 +235,29 @@ def generate_synthetic_data(X: pd.DataFrame, y: pd.Series, n: int = 100) -> Tupl
         p = RENTAL_PROFILES[profile]
         rent = np.clip(np.random.normal(p["mean"], p["std"]), p["min"], p["max"])
         
-        prop_value = rent * 12 * (15 + np.random.normal(0, 3))
+        # More realistic property value based on yield
+        yield_rate = np.random.uniform(0.03, 0.06)  # 3-6% rental yield
+        prop_value = (rent * 12) / yield_rate
+        
         features = {
-            "growth_latest_avg_price": prop_value,
-            "sale_demand_mean_price": prop_value * (0.9 + np.random.random() * 0.2),
-            "sold_price_min_5yrs": prop_value * 0.6, "sold_price_max_5yrs": prop_value * 1.5,
-            "rent_demand_mean_pcm": rent * 0.97, "rent_avg_pcm": rent * (0.9 + np.random.random() * 0.2),
-            "rent_pcm_min": rent * 0.6, "rent_pcm_max": rent * 1.8,
-            "total_properties": np.random.randint(5000, 50000),
-            "current_rent_listings": np.random.randint(10, 500),
-            "current_sale_listings": np.random.randint(20, 800),
-            "rent_listing_count": np.random.randint(5, 200),
-            "sale_listing_count": np.random.randint(10, 300),
-            "rent_demand_days_on_market": np.random.randint(14, 60),
-            "rent_demand_months_inventory": np.random.uniform(0.5, 4),
-            "sale_demand_days_on_market": np.random.randint(30, 120),
-            "growth_5yr_total_pct": np.random.normal(20, 15),
-            "crime_total_incidents": int((500 if profile in ["prime_london", "central_london"] else 300) * (0.5 + np.random.random())),
+            "growth_latest_avg_price": prop_value * np.random.uniform(0.95, 1.05),
+            "sale_demand_mean_price": prop_value * np.random.uniform(0.9, 1.1),
+            "sold_price_min_5yrs": prop_value * np.random.uniform(0.7, 0.9),
+            "sold_price_max_5yrs": prop_value * np.random.uniform(1.1, 1.4),
+            "rent_demand_mean_pcm": rent * np.random.uniform(0.95, 1.05),
+            "rent_avg_pcm": rent * np.random.uniform(0.9, 1.1),
+            "rent_pcm_min": rent / rent_range_ratio,
+            "rent_pcm_max": rent * (rent_range_ratio - 1),
+            "total_properties": int(np.random.lognormal(9, 0.8)),  # Log-normal for realistic distribution
+            "current_rent_listings": int(np.random.lognormal(4, 1.2)),
+            "current_sale_listings": int(np.random.lognormal(4.5, 1.2)),
+            "rent_listing_count": int(np.random.lognormal(3.5, 1)),
+            "sale_listing_count": int(np.random.lognormal(4, 1)),
+            "rent_demand_days_on_market": int(np.random.gamma(3, 10)),  # Skewed distribution
+            "rent_demand_months_inventory": np.random.gamma(2, 1),
+            "sale_demand_days_on_market": int(np.random.gamma(4, 15)),
+            "growth_5yr_total_pct": np.random.normal(25, 20),
+            "crime_total_incidents": int(np.random.gamma(3, 150 if profile in ["prime_london", "central_london"] else 80)),
         }
         features["growth_avg_yearly_pct"] = features["growth_5yr_total_pct"] / 5
         for col in X.columns:
@@ -259,11 +291,16 @@ def train_quantile_model(X: pd.DataFrame, y: pd.Series, min_samples: int = 20) -
     for q in QUANTILES:
         print(f"    Training Q{int(q*100)}...")
         if USE_LIGHTGBM:
-            model = lgb.LGBMRegressor(objective="quantile", alpha=q, n_estimators=50, max_depth=4,
-                                       learning_rate=0.1, num_leaves=15, min_child_samples=3, random_state=42, verbose=-1)
+            # Optimized hyperparameters for better accuracy
+            model = lgb.LGBMRegressor(objective="quantile", alpha=q, n_estimators=150, max_depth=5,
+                                       learning_rate=0.05, num_leaves=31, min_child_samples=5,
+                                       subsample=0.8, colsample_bytree=0.8, reg_alpha=0.1, reg_lambda=0.1,
+                                       random_state=42, verbose=-1)
         else:
-            model = GradientBoostingRegressor(loss="quantile", alpha=q, n_estimators=50, max_depth=3,
-                                               learning_rate=0.1, min_samples_leaf=3, random_state=42)
+            # Optimized sklearn fallback
+            model = GradientBoostingRegressor(loss="quantile", alpha=q, n_estimators=150, max_depth=4,
+                                               learning_rate=0.05, min_samples_leaf=5, subsample=0.8,
+                                               random_state=42)
         model.fit(X_train, y_train)
         models[f"q{int(q*100)}"] = model
     
