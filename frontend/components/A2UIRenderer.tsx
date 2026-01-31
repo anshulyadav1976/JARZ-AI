@@ -8,6 +8,7 @@ import { RentForecastChart } from "./RentForecastChart";
 import { NeighbourHeatmapMap } from "./NeighbourHeatmapMap";
 import { DriversBar } from "./DriversBar";
 import { WhatIfControls } from "./WhatIfControls";
+import { CarbonCard } from "./CarbonCard";
 import { InvestmentCalculator } from "./InvestmentCalculator";
 
 interface A2UIRendererProps {
@@ -29,6 +30,7 @@ const COMPONENT_REGISTRY: Record<
   NeighbourHeatmapMap: NeighbourHeatmapMapWrapper,
   DriversBar: DriversBarWrapper,
   WhatIfControls: WhatIfControlsWrapper,
+  CarbonCard: CarbonCardWrapper,
 };
 
 // Wrapper components to handle A2UI props
@@ -182,6 +184,45 @@ function WhatIfControlsWrapper({
       onKNeighborsChange={() => {}}
       onCompareToggle={() => {}}
       compareMode={false}
+    />
+  );
+}
+
+function CarbonCardWrapper({
+  props,
+  dataModel,
+}: {
+  props: Record<string, unknown>;
+  dataModel: Record<string, unknown>;
+}) {
+  const location = resolveBoundValue(props.location as Record<string, unknown>, dataModel) as string;
+  const currentEmissions = resolveBoundValue(props.currentEmissions as Record<string, unknown>, dataModel) as number;
+  const potentialEmissions = resolveBoundValue(props.potentialEmissions as Record<string, unknown>, dataModel) as number;
+  const emissionsMetric = resolveBoundValue(props.emissionsMetric as Record<string, unknown>, dataModel) as string;
+  const energyRating = resolveBoundValue(props.energyRating as Record<string, unknown>, dataModel) as string;
+  const propertySize = resolveBoundValue(props.propertySize as Record<string, unknown>, dataModel) as number;
+  const propertyType = resolveBoundValue(props.propertyType as Record<string, unknown>, dataModel) as string;
+  const reductionPercent = resolveBoundValue(props.reductionPercent as Record<string, unknown>, dataModel) as number;
+  
+  // Get recommendations from data model
+  const recommendationsPath = "/carbon/recommendations";
+  const recommendations = resolveBoundValue({ path: recommendationsPath }, dataModel) as Array<Record<string, unknown>> || [];
+
+  return (
+    <CarbonCard
+      location={location || "Unknown"}
+      currentEmissions={currentEmissions || 0}
+      potentialEmissions={potentialEmissions || 0}
+      emissionsMetric={emissionsMetric || "tonnes CO2/year"}
+      energyRating={energyRating || "C"}
+      propertySize={propertySize || 0}
+      propertyType={propertyType || "flat"}
+      reductionPercent={reductionPercent || 0}
+      recommendations={recommendations.map((r) => ({
+        recommendation: r.recommendation as string,
+        potential_reduction: r.potential_reduction as number,
+        cost_estimate: r.cost_estimate as string,
+      }))}
     />
   );
 }

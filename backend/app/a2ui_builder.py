@@ -266,6 +266,52 @@ def build_what_if_controls(
     ]
 
 
+def build_carbon_card(
+    location: str,
+    current_emissions: float,
+    potential_emissions: float,
+    emissions_metric: str,
+    energy_rating: str,
+    property_size: float,
+    property_type: str,
+    recommendations: list[dict],
+) -> list[dict]:
+    """Build CarbonCard A2UI component for embodied carbon display."""
+    messages = []
+    
+    # Build carbon card component
+    carbon_component = {
+        "id": "carbon_card",
+        "component": {
+            "CarbonCard": {
+                "location": _literal_string(location),
+                "currentEmissions": _literal_number(current_emissions),
+                "potentialEmissions": _literal_number(potential_emissions),
+                "emissionsMetric": _literal_string(emissions_metric),
+                "energyRating": _literal_string(energy_rating),
+                "propertySize": _literal_number(property_size),
+                "propertyType": _literal_string(property_type),
+                "reductionPercent": _literal_number(
+                    ((current_emissions - potential_emissions) / current_emissions) * 100
+                ),
+            }
+        }
+    }
+    
+    # Surface update with carbon component
+    messages.append(build_surface_update([carbon_component]))
+    
+    # Data model update with recommendations
+    messages.append(build_data_model_update([
+        {"key": "recommendations", "valueArray": recommendations},
+    ], path="/carbon"))
+    
+    # Begin rendering (if needed)
+    messages.append(build_begin_rendering("carbon_card"))
+    
+    return messages
+
+
 # ============================================================================
 # Message Builders
 # ============================================================================

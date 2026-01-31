@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     
     # ScanSan API
     scansan_api_key: str = ""
-    scansan_base_url: str = "https://api.scansan.com/v1"
+    scansan_base_url: str = "https://api.scansan.com"
     use_scansan: bool = False
     
     # Model configuration (PLACEHOLDER - teammate will change these)
