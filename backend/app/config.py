@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # Model configuration (PLACEHOLDER - teammate will change these)
     model_provider: str = "stub"  # stub | local_pickle | http
     model_path: str = "./models/model.pkl"
-    model_http_url: str = "http://localhost:8001/predict"
+    model_http_url: str = "http://localhost:8000/predict"
     
     # Cache settings
     cache_ttl_seconds: int = 3600

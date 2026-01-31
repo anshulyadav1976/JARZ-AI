@@ -81,7 +81,7 @@ npm install
 Set the backend URL in `frontend/.env.local`:
 
 ```
-NEXT_PUBLIC_API_URL=http://localhost:8001
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
 #### Run frontend
@@ -113,7 +113,7 @@ Frontend URL: `http://localhost:3000`
 
 ### “WinError 10013” when starting Uvicorn on port 8000
 
-Use another port (e.g. 8001/5000) and update `frontend/.env.local` accordingly.
+Use another port (e.g. 8002/5000) and update `frontend/.env.local` accordingly.
 
 ### Chat shows no response even though backend returns 200
 

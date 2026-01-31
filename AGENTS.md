@@ -17,7 +17,7 @@ The goal is simple: **don’t break the demo** (chat streaming + A2UI side panel
    - Keep `backend/app/model_adapter.py` adapters clearly labeled PLACEHOLDER.
    - Do not implement training here (teammate owns the real model).
 5. **Keep the system runnable**:
-   - Backend runs on `:8001` by default on Windows (port 8000 may be blocked).
+   - Backend runs on `:8000` by default.
    - Frontend runs on `:3000`.
 
 ---
@@ -182,7 +182,7 @@ If you change *any* of these:
 ```powershell
 cd backend
 .\venv\Scripts\Activate.ps1
-python -m uvicorn app.main:app --reload --port 8001
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
 ### Frontend dev
@@ -202,7 +202,7 @@ npm run dev
 2. Browser console:
    - Any `Failed to parse SSE data` errors?
 3. Ensure frontend env points to correct backend:
-   - `NEXT_PUBLIC_API_URL=http://localhost:8001`
+   - `NEXT_PUBLIC_API_URL=http://localhost:8000`
 
 ---
 
