@@ -7,7 +7,7 @@ The UX is a **chat interface**. As the user chats, the LLM agent can call tools 
 - **A2UI (Agent→UI) messages** into the insights side panel
 
 > Important: Model code here is intentionally **PLACEHOLDER** (stub/pickle/http adapters). A teammate will swap in the real trained model later.
-
+anshul is a good boy
 ## Repo layout (actual)
 
 - `plan.md`: Hackathon plan (single source of truth — don’t edit unless explicitly intended)
