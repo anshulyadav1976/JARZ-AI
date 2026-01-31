@@ -1,51 +1,201 @@
-/frontend/node_modules
-/backend/.env/
-/backend/.env.*
-/backend/env.txt
-/backend/.env
-/backend/.env.*
-/backend/env.txt
-/backend/.env
-/backend/.env.*
-/backend/env.txt
-/backend/.env
-/backend/env
+# ==========================================
+# JARZ-AI Project .gitignore
+# ==========================================
+
+# ============ Python ============
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+backend/.venv/
+backend/venv/
+models/venv/
+
+# PyCharm
+.idea/
+
+# ============ Node.js / Frontend ============
+node_modules/
+frontend/node_modules/
+
+# Next.js
+frontend/.next/
+frontend/.next/cache/
+frontend/out/
+frontend/build/
+
+# Production build
+/build
+/dist
+
+# ============ Environment Variables ============
+.env
+.env.*
+!.env.example
+backend/.env
+backend/env.txt
+frontend/.env.local
+frontend/.env.*.local
+models/.env
 env.txt
-/.env
-/.env.*
-/JARZ-AI/.env
-/JARZ-AI/.env.*
-/JARZ-AI/env.txt
-/JARZ-AI/.env
-/JARZ-AI/.env.*
-/JARZ-AI/env.txt
-/JARZ-AI/.env
-/JARZ-AI/.env.*
-/JARZ-AI/env.txt
-/JARZ-AI/env.txt    
-/JARZ-AI/env.txt    
-wordlist.txt 
-no matching environment variables found.txt
-/JARZ-AI/data
-/JARZ-AI/data/raw
-/JARZ-AI/data/raw/district_training_data.parquet
-/JARZ-AI/data/raw/district_growth_timeseries.parquet
-/JARZ-AI/data/raw/district_training_data.parquet    
-/JARZ-AI/data/raw/district_growth_timeseries.parquet
-/JARZ-AI/data/raw/district_training_data.parquet    
-/JARZ-AI/data/raw/district_growth_timeseries.parquet    
-omg my brain is fried.txt
-/venv/
-/venv/bin/
-/venv/bin/activate
-/venv/bin/deactivate
-/venv/bin/pip
-/venv/bin/pip-compile
-/venv/bin/pip-sync
-/venv/bin/pip-uninstall
-/venv/bin/pip-install
-/venv/bin/pip-upgrade
-/venv/bin/pip-show
-/venv/bin/pip-list
-/backend/venv/
-venv
+*.env.local
+
+# ============ IDE & Editors ============
+# VS Code
+.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============ Operating Systems ============
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ============ Logs & Debugging ============
+*.log
+logs/
+*.log.*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# ============ Testing & Coverage ============
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+coverage/
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# ============ Machine Learning / Models ============
+# Model files
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.joblib
+*.pth
+*.onnx
+*.pb
+*.tflite
+*.pt
+
+# Data files
+*.parquet
+*.csv
+*.json.gz
+*.feather
+models/model-files/
+models/data/
+models/data/raw/
+models/data/processed/
+models/checkpoints/
+models/logs/
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/*
+
+# ============ Documentation ============
+docs/_build/
+site/
+
+# ============ Temporary Files ============
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+.cache/
+tmp/
+temp/
+
+# ============ Database ============
+*.db
+*.sqlite
+*.sqlite3
+
+# ============ Miscellaneous ============
+wordlist.txt
+*.txt
+!requirements.txt
+!README.txt
+!LICENSE.txt
+
+# ============ Git ============
+*.orig
+*.rej
