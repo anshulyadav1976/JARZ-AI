@@ -105,3 +105,52 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Print Styles for Clean PDF Export */
+@media print {
+  /* Hide interactive elements */
+  header,
+  button,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset backgrounds for print */
+  body,
+  * {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Ensure content fits */
+  main {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* Page breaks */
+  .page-break {
+    page-break-before: always;
+  }
+
+  .page-break-avoid {
+    page-break-inside: avoid;
+  }
+
+  /* Better spacing */
+  .print-spacing {
+    margin-bottom: 1rem;
+  }
+
+  /* Show print-only elements */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Optimize charts and images */
+  svg,
+  img {
+    max-width: 100%;
+    page-break-inside: avoid;
+  }
+}
