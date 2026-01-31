@@ -33,12 +33,12 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
 ## Deliverables checklist (build order)
 
 ### 0) Repo setup
-- [ ] Create project structure:
+- [x] Create project structure:
   - `backend/` (FastAPI + LangGraph)
   - `frontend/` (Next.js + A2UI renderer)
-  - `shared/` (pydantic schemas, component contracts)
+  - `shared/` (pydantic schemas, component contracts) - Note: schemas in backend/app/schemas.py
   - `docs/` (API notes, demo script)
-- [ ] Add `.env.example` for keys/config (ScanSan base URL, token, cache toggles)
+- [x] Add `.env.example` for keys/config (ScanSan base URL, token, cache toggles)
 
 ---
 
@@ -46,7 +46,7 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
 > Goal: make model + agent + UI plug together cleanly.
 
 ### 1.1 Data contracts
-- [ ] Define pydantic types (in `shared/schemas.py`):
+- [x] Define pydantic types (in `backend/app/schemas.py`):
   - `UserQuery`: `location_input`, `area_code`, `horizon_months`, `view_mode` (`single|compare`), `radius_km`, `k_neighbors`
   - `ModelFeatures`: dict-like structure (allow flexible features)
   - `PredictionResult`:
@@ -60,7 +60,7 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
   - `A2UIMessage`: `{type, component, props, id}`
 
 ### 1.2 Model adapter interface (CRITICAL)
-- [ ] Create `backend/model_adapter.py` with an interface like:
+- [x] Create `backend/app/model_adapter.py` with an interface like: ( this can change later on after the model is built by the teammate)
 
   **Required function**
   - `predict_quantiles(features: ModelFeatures) -> PredictionResult`
@@ -68,12 +68,12 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
   **Optional**
   - `predict_quantiles_batch(list[ModelFeatures]) -> list[PredictionResult]`
 
-- [ ] Implement **placeholder model adapter**:
+- [x] Implement **placeholder model adapter**:
   - deterministic + seeded random outputs
   - returns plausible P10/P50/P90
   - used until teammate model is available
 
-- [ ] Add swap-in mechanism:
+- [x] Add swap-in mechanism:
   - `MODEL_PROVIDER=stub|local_pickle|http`
   - If `local_pickle`: load a saved model artifact (path from env)
   - If `http`: call teammate’s model service endpoint (URL from env)
@@ -86,25 +86,18 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
 > Goal: get features from sponsor API at runtime (and/or cache for reliability).
 
 ### 2.1 Client
-- [ ] Create `backend/scansan_client.py` with:
+- [x] Create `backend/app/scansan_client.py` with:
   - auth header support
   - retries + timeouts
   - rate limit friendly backoff
-- [ ] Implement endpoints (minimum):
-  - `area_codes_search(query: str)`
-  - `area_summary(area_code: str)`
-  - `rent_listings(area_code: str, filters...)`
-  - `district_rent_demand(area_code_district: str, period: str|None)`
-  - `district_growth(area_code_district: str)`
+- [x] Implement endpoints (minimum):
+  - `area_codes_search(query: str)` - search_area_codes()
+  - `area_summary(area_code: str)` - get_area_summary()
+  - `rent_listings(area_code: str, filters...)` - get_rent_listings()
+  - `district_rent_demand(area_code_district: str, period: str|None)` - get_district_demand()
+  - `district_growth(area_code_district: str)` - get_district_growth()
+- [x] Added fallback mock data for demo reliability
 
-### 2.2 Caching layer
-- [ ] Add `backend/cache.py`:
-  - in-memory LRU (fast)
-  - optional disk cache (json) for demo stability
-- [ ] Cache keys include: endpoint + params
-- [ ] TTL per resource:
-  - search: long TTL
-  - demand/listings: shorter TTL (or fixed for hackathon)
 
 ---
 
@@ -112,30 +105,30 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
 > Goal: build the “dependence” features the model needs.
 
 ### 3.1 Location normalization
-- [ ] `resolve_location(location_input)`:
+- [x] `resolve_location(location_input)`:
   - uses ScanSan search
   - returns standardized `area_code` + `area_code_district` + centroid lat/lon if available
 - [ ] If ScanSan doesn’t return lat/lon, store a fallback geometry mapping (static demo file).
 
 ### 3.2 Temporal features
-- [ ] Build time-lag features from:
+- [x] Build time-lag features from:
   - district growth series (if available)
   - cached historical snapshots (if available)
-- [ ] Features examples:
+- [x] Features examples:
   - `rent_growth_mom`, `rent_growth_yoy`
   - `demand_index_t`, `demand_index_t-1` (if period series available)
   - `month`, `quarter`
 
 ### 3.3 Spatial neighbor graph
-- [ ] Implement `neighbors.py`:
+- [x] Implement neighbor logic in `scansan_client.py` and `feature_builder.py`:
   - build neighbor list for a district based on:
     - `k_neighbors` using centroid distance (preferred)
     - OR radius-km filtering
-- [ ] Compute spatial lag features:
+- [x] Compute spatial lag features:
   - neighbor average demand, neighbor average growth, neighbor rent proxies if available
 
 ### 3.4 Final feature assembly
-- [ ] `build_features(query: UserQuery) -> ModelFeatures`:
+- [x] `build_features(query: UserQuery) -> ModelFeatures`:
   - merges:
     - area summary stats
     - demand stats
@@ -151,11 +144,11 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
 > Goal: “why did the model predict this?”
 
 ### 4.1 SHAP strategy
-- [ ] Implement `backend/explain.py` with:
+- [x] Implement `backend/app/explain.py` with:
   - `explain_prediction(model, features) -> ExplanationResult`
-- [ ] If model is `stub`:
+- [x] If model is `stub`:
   - return heuristic drivers (based on feature weights)
-- [ ] If model is real tree model:
+- [x] If model is real tree model:
   - load SHAP explainer once at startup (if feasible)
   - compute SHAP values per request (single row)
   - return top N features (e.g., 8)
@@ -168,7 +161,7 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
 > Goal: controlled pipeline that outputs A2UI messages.
 
 ### 5.1 Agent state
-- [ ] Define state:
+- [x] Define state in `backend/app/agent/state.py`:
   - query params
   - resolved location
   - raw fetched data
@@ -178,18 +171,18 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
   - ui_messages
 
 ### 5.2 Agent nodes (must implement)
-- [ ] `ResolveLocationNode`
-- [ ] `FetchDataNode` (ScanSan calls + caching)
-- [ ] `BuildFeaturesNode`
-- [ ] `PredictNode` (calls model adapter)
-- [ ] `ExplainNode` (SHAP / heuristic)
-- [ ] `RenderA2UINode` (build component messages)
-- [ ] `CompareFlowNode` (if view_mode=compare)
+- [x] `ResolveLocationNode`
+- [x] `FetchDataNode` (ScanSan calls + caching)
+- [x] `BuildFeaturesNode`
+- [x] `PredictNode` (calls model adapter)
+- [x] `ExplainNode` (SHAP / heuristic)
+- [x] `RenderA2UINode` (build component messages)
+- [ ] `CompareFlowNode` (if view_mode=compare) - TODO: future enhancement
 
 ### 5.3 Agent entrypoints
-- [ ] REST endpoint: `POST /api/query`
+- [x] REST endpoint: `POST /api/query`
   - returns full response JSON
-- [ ] Streaming endpoint (recommended): `POST /api/stream`
+- [x] Streaming endpoint (recommended): `POST /api/stream`
   - Server-Sent Events (SSE) streaming A2UI messages
   - each message is an `A2UIMessage`
 
@@ -199,35 +192,35 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
 > Goal: render structured component messages from the agent.
 
 ### 6.1 A2UI renderer
-- [ ] Build `frontend/components/A2UIRenderer.tsx`:
+- [x] Build `frontend/components/A2UIRenderer.tsx`:
   - accepts a list/stream of messages
   - renders by `component` name mapping:
     - `RentForecastChart`
     - `NeighbourHeatmapMap`
     - `DriversBar`
-    - `CompsTable`
+    - `CompsTable` - TODO: future enhancement
     - `SummaryCard`
     - `WhatIfControls`
 
 ### 6.2 UI components (minimum)
-- [ ] `SummaryCard`
+- [x] `SummaryCard`
   - shows P50 rent + band + key takeaway text
-- [ ] `RentForecastChart`
+- [x] `RentForecastChart`
   - line for P50 + shaded band for P10–P90 over horizon
   - include historical context if available
-- [ ] `NeighbourHeatmapMap`
+- [x] `NeighbourHeatmapMap`
   - simple choropleth/heatmap:
     - selected district highlighted
     - neighbors highlighted
-- [ ] `DriversBar`
+- [x] `DriversBar`
   - horizontal bar chart of top SHAP contributors (+/-)
-- [ ] `WhatIfControls`
+- [x] `WhatIfControls`
   - horizon slider (1/3/6/12 months)
   - neighbor radius/k slider
   - compare mode toggle
 
 ### 6.3 Data flow (frontend)
-- [ ] `useAgentStream()` hook:
+- [x] `useAgentStream()` hook:
   - calls `/api/stream`
   - appends streamed A2UI messages
   - re-renders incremental UI
@@ -278,6 +271,8 @@ We are building a **Spatio-Temporal Rental Valuation** demo for the RealTech Hac
 - `GET /v1/district/{area_code_district}/growth`
   - growth series (MoM/YoY)
 
+chekc documentation for the api here: https://docs.scansan.com/v1/docs
+
 **Note**: Treat ScanSan as runtime feature source + location resolver.
 Training can also use it, but this repo focuses on runtime + orchestration.
 
@@ -299,21 +294,13 @@ OR
 ---
 
 ## 10) Acceptance criteria
-- [ ] User can enter a district/postcode and get:
+- [x] User can enter a district/postcode and get:
   - predicted rent P50
   - confidence band P10–P90
   - explanation drivers
   - map + timeline rendered from A2UI messages
-- [ ] Compare mode works for two locations
-- [ ] System still functions on stub model (for dev)
-- [ ] Swap-in real model is one config change
+- [ ] Compare mode works for two locations - TODO: future enhancement
+- [x] System still functions on stub model (for dev)
+- [x] Swap-in real model is one config change (MODEL_PROVIDER env var)
 
 ---
-
-## 11) Demo script (30–60 seconds)
-- “We model rent as a spatio-temporal process: past trends + neighbor effects.”
-- Show a district:
-  - timeline with P10–P90 band
-  - map highlighting neighbor graph
-  - SHAP drivers explaining which factors matter
-- Toggle horizon and show updated prediction live.
