@@ -180,10 +180,10 @@ We train separate models for \(q \in \{0.1, 0.5, 0.9\}\) → **P10/P50/P90**.
 
 ### Spatial features (K nearest neighbors)
 
-We capture neighborhood effects by averaging neighbor signals:
+We capture neighborhood effects by averaging neighbor signals (same as `spatial_rent_neighbor_avg` in the notebook):
 
 $$
-\mathrm{spatial\_rent\_neighbor\_avg}=\frac{1}{K}\sum_{i=1}^{K}\mathrm{rent}_{i}
+\bar{r}_{\mathrm{neighbors}} = \frac{1}{K}\sum_{i=1}^{K} r_{i}
 $$
 
 ### Explainability (SHAP)
