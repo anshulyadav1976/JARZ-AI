@@ -700,6 +700,253 @@ async def get_property_listings(request: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/heatmap/areas")
+async def get_heatmap_data(
+    listing_type: str = "rent",
+    bounds: Optional[str] = None,
+):
+    """
+    Get heatmap data for London areas.
+    
+    Query params:
+    - listing_type: "rent" or "sale" (default: rent)
+    - bounds: Optional bounding box as "minLat,minLng,maxLat,maxLng"
+    
+    Returns aggregated price data for area codes with coordinates.
+    """
+    try:
+        # Common London area codes (outward codes)
+        # These are the main London postcodes we'll fetch data for
+        london_areas = [
+            # Central London
+            "EC1", "EC2", "EC3", "EC4", "WC1", "WC2",
+            "E1", "E2", "E3", "E8", "E9", "E14", "E15", "E16", "E20",
+            "N1", "N4", "N5", "N7", "N16", "N19",
+            "NW1", "NW3", "NW5", "NW6", "NW8",
+            "SE1", "SE5", "SE8", "SE10", "SE11", "SE15", "SE16", "SE17",
+            "SW1", "SW3", "SW5", "SW6", "SW7", "SW8", "SW9", "SW10", "SW11",
+            "W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W14",
+            # Outer London samples
+            "BR1", "CR0", "DA14", "E4", "E10", "E11", "E12", "E13", "E17", "E18",
+            "EN1", "HA0", "HA8", "IG1", "KT1", "N2", "N3", "N6", "N8", "N10",
+            "N11", "N12", "N13", "N14", "N15", "N17", "N18", "N20", "N22",
+            "NW2", "NW4", "NW7", "NW9", "NW10", "NW11",
+            "RM1", "SE2", "SE3", "SE4", "SE6", "SE7", "SE9", "SE12", "SE13", "SE14", "SE18", "SE19", "SE20",
+            "SM1", "SW2", "SW4", "SW12", "SW13", "SW15", "SW16", "SW17", "SW18", "SW19", "SW20",
+            "TW1", "UB1", "W3", "W4", "W5", "W7", "W13",
+        ]
+        
+        scansan_client = get_scansan_client()
+        heatmap_data = []
+        
+        # Approximate coordinates for London postcodes (simplified mapping)
+        # In a real implementation, you'd get these from a geocoding service
+        area_coords = {
+            # Central postcodes
+            "EC1": (51.5200, -0.1050), "EC2": (51.5175, -0.0860), "EC3": (51.5130, -0.0820), "EC4": (51.5155, -0.1030),
+            "WC1": (51.5240, -0.1280), "WC2": (51.5125, -0.1210),
+            "E1": (51.5180, -0.0550), "E2": (51.5310, -0.0590), "E3": (51.5330, -0.0280), "E8": (51.5450, -0.0560), 
+            "E9": (51.5550, -0.0490), "E14": (51.5050, -0.0200), "E15": (51.5420, -0.0050), "E16": (51.5100, 0.0240), "E20": (51.5450, -0.0100),
+            "N1": (51.5400, -0.1050), "N4": (51.5650, -0.1000), "N5": (51.5580, -0.1050), "N7": (51.5550, -0.1180), "N16": (51.5600, -0.0750), "N19": (51.5650, -0.1310),
+            "NW1": (51.5350, -0.1450), "NW3": (51.5550, -0.1680), "NW5": (51.5550, -0.1430), "NW6": (51.5500, -0.1900), "NW8": (51.5350, -0.1750),
+            "SE1": (51.5020, -0.0950), "SE5": (51.4820, -0.0880), "SE8": (51.4870, -0.0280), "SE10": (51.4850, 0.0050), "SE11": (51.4930, -0.1150),
+            "SE15": (51.4750, -0.0630), "SE16": (51.4950, -0.0550), "SE17": (51.4900, -0.0950),
+            "SW1": (51.4975, -0.1357), "SW3": (51.4930, -0.1650), "SW5": (51.4920, -0.1900), "SW6": (51.4820, -0.1950), "SW7": (51.4950, -0.1750),
+            "SW8": (51.4820, -0.1280), "SW9": (51.4680, -0.1180), "SW10": (51.4850, -0.1850), "SW11": (51.4650, -0.1650),
+            "W1": (51.5140, -0.1480), "W2": (51.5150, -0.1780), "W6": (51.4950, -0.2280), "W8": (51.5030, -0.1930), 
+            "W9": (51.5230, -0.1850), "W10": (51.5250, -0.2100), "W11": (51.5150, -0.2050), "W12": (51.5100, -0.2320), "W14": (51.4950, -0.2100),
+            # Outer areas (approximate)
+            "BR1": (51.4050, 0.0130), "CR0": (51.3720, -0.0980), "DA14": (51.4280, 0.1280), "E4": (51.6150, -0.0080), "E10": (51.5650, -0.0130),
+            "E11": (51.5580, 0.0050), "E12": (51.5480, 0.0430), "E13": (51.5200, 0.0450), "E17": (51.5880, -0.0180), "E18": (51.5950, 0.0280),
+            "EN1": (51.6520, -0.0820), "HA0": (51.5580, -0.2950), "HA8": (51.6150, -0.2780), "IG1": (51.5580, 0.0780), "KT1": (51.4100, -0.3050),
+            "N2": (51.5800, -0.1480), "N3": (51.6050, -0.1750), "N6": (51.5680, -0.1430), "N8": (51.5850, -0.1180), "N10": (51.5980, -0.1480),
+            "N11": (51.6120, -0.1050), "N12": (51.6180, -0.1480), "N13": (51.6150, -0.0980), "N14": (51.6380, -0.1180), "N15": (51.5880, -0.0780),
+            "N17": (51.6020, -0.0680), "N18": (51.6180, -0.0580), "N20": (51.6280, -0.1650), "N22": (51.6050, -0.1080),
+            "NW2": (51.5650, -0.2150), "NW4": (51.5850, -0.2280), "NW7": (51.6050, -0.2350), "NW9": (51.6080, -0.2650), 
+            "NW10": (51.5450, -0.2450), "NW11": (51.5750, -0.1980),
+            "RM1": (51.5780, 0.1850), "SE2": (51.4880, 0.0950), "SE3": (51.4650, 0.0150), "SE4": (51.4620, -0.0280), "SE6": (51.4480, -0.0180),
+            "SE7": (51.4950, 0.0450), "SE9": (51.4450, 0.0480), "SE12": (51.4450, -0.0050), "SE13": (51.4580, -0.0180), "SE14": (51.4750, -0.0480),
+            "SE18": (51.4950, 0.0880), "SE19": (51.4250, -0.0850), "SE20": (51.4120, -0.0550),
+            "SM1": (51.3980, -0.1950), "SW2": (51.4550, -0.1250), "SW4": (51.4650, -0.1380), "SW12": (51.4550, -0.1650), "SW13": (51.4650, -0.2580),
+            "SW15": (51.4580, -0.2250), "SW16": (51.4280, -0.1250), "SW17": (51.4280, -0.1680), "SW18": (51.4550, -0.1880), 
+            "SW19": (51.4180, -0.1950), "SW20": (51.4080, -0.1950),
+            "TW1": (51.4480, -0.3280), "UB1": (51.5180, -0.3480), "W3": (51.5180, -0.2680), "W4": (51.4950, -0.2580), 
+            "W5": (51.5150, -0.3080), "W7": (51.5080, -0.3380), "W13": (51.5150, -0.3350),
+        }
+        
+        # Fetch summary data for each area
+        for area in london_areas:
+            try:
+                summary = await scansan_client.get_area_summary(area)
+                
+                if summary and "data" in summary:
+                    data_list = summary["data"]
+                    
+                    # ScanSan returns data as a list, get first element
+                    if isinstance(data_list, list) and len(data_list) > 0:
+                        data = data_list[0]
+                    else:
+                        continue
+                    
+                    # Get coordinates
+                    coords = area_coords.get(area, (51.5074, -0.1278))  # Default to London center
+                    
+                    # Extract price data based on listing type
+                    if listing_type == "rent":
+                        # Get rent data
+                        rent_range = data.get("current_rent_listings_pcm_range")
+                        listing_count = data.get("current_rent_listings", 0)
+                        if rent_range and len(rent_range) == 2:
+                            min_price = rent_range[0]
+                            max_price = rent_range[1]
+                            median_price = (min_price + max_price) / 2
+                        else:
+                            min_price = None
+                            max_price = None
+                            median_price = None
+                    else:
+                        # Get sale data
+                        sale_range = data.get("current_sale_listings_price_range")
+                        listing_count = data.get("current_sale_listings", 0)
+                        if sale_range and len(sale_range) == 2:
+                            min_price = sale_range[0]
+                            max_price = sale_range[1]
+                            median_price = (min_price + max_price) / 2
+                        else:
+                            min_price = None
+                            max_price = None
+                            median_price = None
+                    
+                    # Use median as the primary price
+                    price = median_price
+                    
+                    if price:
+                        heatmap_data.append({
+                            "area_code": area,
+                            "lat": coords[0],
+                            "lng": coords[1],
+                            "price": price,
+                            "min_price": min_price,
+                            "max_price": max_price,
+                            "median_price": median_price,
+                            "listing_count": listing_count,
+                        })
+            except Exception as e:
+                print(f"[HEATMAP] Error fetching data for {area}: {e}")
+                continue
+        
+        return {
+            "success": True,
+            "listing_type": listing_type,
+            "count": len(heatmap_data),
+            "data": heatmap_data,
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/heatmap/crime")
+async def get_crime_heatmap_data(bounds: Optional[str] = None):
+    """
+    Get crime heatmap data for London areas.
+    
+    Returns aggregated crime data for area codes with coordinates.
+    """
+    try:
+        # Same London area codes
+        london_areas = [
+            # Central London
+            "EC1", "EC2", "EC3", "EC4", "WC1", "WC2",
+            "E1", "E2", "E3", "E8", "E9", "E14", "E15", "E16", "E20",
+            "N1", "N4", "N5", "N7", "N16", "N19",
+            "NW1", "NW3", "NW5", "NW6", "NW8",
+            "SE1", "SE5", "SE8", "SE10", "SE11", "SE15", "SE16", "SE17",
+            "SW1", "SW3", "SW5", "SW6", "SW7", "SW8", "SW9", "SW10", "SW11",
+            "W1", "W2", "W6", "W8", "W9", "W10", "W11", "W12", "W14",
+            # Outer London samples
+            "BR1", "CR0", "DA14", "E4", "E10", "E11", "E12", "E13", "E17", "E18",
+            "EN1", "HA0", "HA8", "IG1", "KT1", "N2", "N3", "N6", "N8", "N10",
+            "N11", "N12", "N13", "N14", "N15", "N17", "N18", "N20", "N22",
+            "NW2", "NW4", "NW7", "NW9", "NW10", "NW11",
+            "RM1", "SE2", "SE3", "SE4", "SE6", "SE7", "SE9", "SE12", "SE13", "SE14", "SE18", "SE19", "SE20",
+            "SM1", "SW2", "SW4", "SW12", "SW13", "SW15", "SW16", "SW17", "SW18", "SW19", "SW20",
+            "TW1", "UB1", "W3", "W4", "W5", "W7", "W13",
+        ]
+        
+        scansan_client = get_scansan_client()
+        heatmap_data = []
+        
+        # Same coordinate mapping as price heatmap
+        area_coords = {
+            # Central postcodes
+            "EC1": (51.5200, -0.1050), "EC2": (51.5175, -0.0860), "EC3": (51.5130, -0.0820), "EC4": (51.5155, -0.1030),
+            "WC1": (51.5240, -0.1280), "WC2": (51.5125, -0.1210),
+            "E1": (51.5180, -0.0550), "E2": (51.5310, -0.0590), "E3": (51.5330, -0.0280), "E8": (51.5450, -0.0560), 
+            "E9": (51.5550, -0.0490), "E14": (51.5050, -0.0200), "E15": (51.5420, -0.0050), "E16": (51.5100, 0.0240), "E20": (51.5450, -0.0100),
+            "N1": (51.5400, -0.1050), "N4": (51.5650, -0.1000), "N5": (51.5580, -0.1050), "N7": (51.5550, -0.1180), "N16": (51.5600, -0.0750), "N19": (51.5650, -0.1310),
+            "NW1": (51.5350, -0.1450), "NW3": (51.5550, -0.1680), "NW5": (51.5550, -0.1430), "NW6": (51.5500, -0.1900), "NW8": (51.5350, -0.1750),
+            "SE1": (51.5020, -0.0950), "SE5": (51.4820, -0.0880), "SE8": (51.4870, -0.0280), "SE10": (51.4850, 0.0050), "SE11": (51.4930, -0.1150),
+            "SE15": (51.4750, -0.0630), "SE16": (51.4950, -0.0550), "SE17": (51.4900, -0.0950),
+            "SW1": (51.4975, -0.1405), "SW3": (51.4925, -0.1635), "SW5": (51.4925, -0.1935), "SW6": (51.4825, -0.1935), "SW7": (51.4975, -0.1735),
+            "SW8": (51.4825, -0.1235), "SW9": (51.4675, -0.1135), "SW10": (51.4875, -0.1835), "SW11": (51.4675, -0.1635),
+            "W1": (51.5175, -0.1435), "W2": (51.5175, -0.1735), "W6": (51.4975, -0.2235), "W8": (51.5075, -0.1935), 
+            "W9": (51.5275, -0.1835), "W10": (51.5275, -0.2135), "W11": (51.5175, -0.2035), "W12": (51.5175, -0.2335), "W14": (51.4975, -0.2135),
+            # Outer areas
+            "BR1": (51.4050, 0.0150), "CR0": (51.3750, -0.1000), "DA14": (51.4450, 0.1350), "E4": (51.6050, -0.0150), "E10": (51.5650, -0.0150),
+            "E11": (51.5750, 0.0050), "E12": (51.5550, 0.0450), "E13": (51.5250, 0.0350), "E17": (51.5850, -0.0250), "E18": (51.5950, 0.0250),
+            "EN1": (51.6550, -0.0550), "HA0": (51.5650, -0.3250), "HA8": (51.6050, -0.2850), "IG1": (51.5650, 0.0850), "KT1": (51.4150, -0.3050),
+            "N2": (51.5850, -0.1450), "N3": (51.5950, -0.1650), "N6": (51.5650, -0.1450), "N8": (51.5850, -0.1150), "N10": (51.6050, -0.1450),
+            "N11": (51.6150, -0.1050), "N12": (51.6150, -0.1550), "N13": (51.6250, -0.1050), "N14": (51.6350, -0.1350), "N15": (51.5950, -0.0850),
+            "N17": (51.6050, -0.0650), "N18": (51.6150, -0.0550), "N20": (51.6250, -0.1750), "N22": (51.6050, -0.1250),
+            "NW2": (51.5650, -0.2150), "NW4": (51.6050, -0.2250), "NW7": (51.6250, -0.2150), "NW9": (51.6150, -0.2550), "NW10": (51.5450, -0.2450), "NW11": (51.5850, -0.1950),
+            "RM1": (51.5750, 0.1750), "SE2": (51.4850, 0.1150), "SE3": (51.4650, 0.0150), "SE4": (51.4650, -0.0350), "SE6": (51.4450, -0.0050),
+            "SE7": (51.4950, 0.0650), "SE9": (51.4450, 0.0550), "SE12": (51.4550, -0.0150), "SE13": (51.4550, -0.0250), "SE14": (51.4750, -0.0550),
+            "SE18": (51.4950, 0.0950), "SE19": (51.4250, -0.0850), "SE20": (51.4150, -0.0650),
+            "SM1": (51.4050, -0.1950), "SW2": (51.4575, -0.1235), "SW4": (51.4675, -0.1435), "SW12": (51.4575, -0.1635), "SW13": (51.4675, -0.2335),
+            "SW15": (51.4575, -0.2135), "SW16": (51.4275, -0.1335), "SW17": (51.4275, -0.1635), "SW18": (51.4575, -0.1935), "SW19": (51.4275, -0.1935), "SW20": (51.4175, -0.1935),
+            "TW1": (51.4475, -0.3350), "UB1": (51.5350, -0.3650), "W3": (51.5175, -0.2635), "W4": (51.4975, -0.2535), "W5": (51.5175, -0.3035),
+            "W7": (51.5075, -0.3135), "W13": (51.5175, -0.3335),
+        }
+        
+        # Fetch crime data for each area
+        for area in london_areas:
+            try:
+                crime_summary = await scansan_client.get_crime_summary(area)
+                
+                if crime_summary:
+                    # The response structure is:
+                    # { "area_code": "...", "data": { "total_incidents": 1819, ... } }
+                    data = crime_summary.get("data", {})
+                    
+                    # Get coordinates
+                    coords = area_coords.get(area, (51.5074, -0.1278))
+                    
+                    # Extract crime metrics - API returns total_incidents, not total_crimes
+                    total_incidents = data.get("total_incidents", 0)
+                    
+                    if total_incidents > 0:
+                        heatmap_data.append({
+                            "area_code": area,
+                            "lat": coords[0],
+                            "lng": coords[1],
+                            "crime_count": total_incidents,
+                            "crime_rate": None,  # Not provided by API
+                        })
+            except Exception as e:
+                print(f"[HEATMAP] Error fetching crime data for {area}: {e}")
+                continue
+        
+        return {
+            "success": True,
+            "count": len(heatmap_data),
+            "data": heatmap_data,
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

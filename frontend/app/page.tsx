@@ -7,6 +7,7 @@ import { ChatPanel } from "@/components/ChatPanel";
 import { A2UIRenderer } from "@/components/A2UIRenderer";
 import { PropertyListView } from "@/components/PropertyListView";
 import { PropertyMapView } from "@/components/PropertyMapView";
+import { HeatmapView } from "@/components/HeatmapView";
 import { InsightsActions } from "@/components/InsightsActions";
 import { InsightsDisclaimer } from "@/components/InsightsDisclaimer";
 import { ComparisonMode } from "@/components/ComparisonMode";
@@ -47,7 +48,7 @@ export default function Home() {
   });
   const { state: propertyState, fetchListings, fetchListingsBoth } = usePropertyListings();
   const [activeTab, setActiveTab] = useState("home");
-  const [sidebarMode, setSidebarMode] = useState<"valuation" | "comparison" | "properties" | "sustainability" | "investment" | "market">("valuation");
+  const [sidebarMode, setSidebarMode] = useState<"valuation" | "properties" | "sustainability" | "investment" | "search" | "map">("valuation");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [listingFilterType, setListingFilterType] = useState<"all" | "rent" | "sale">("all");
   const [comparedAreas, setComparedAreas] = useState<string[]>([]);
@@ -571,14 +572,14 @@ export default function Home() {
                 <Calculator className="h-4 w-4" />
               </Button>
             </Tooltip>
-            <Tooltip content="Market Data" side="right">
+            <Tooltip content="Price Heatmap" side="right">
               <Button
-                variant={sidebarMode === "market" ? "secondary" : "ghost"}
+                variant={sidebarMode === "map" ? "secondary" : "ghost"}
                 size="icon"
-                onClick={() => handleManualSidebarChange("market")}
+                onClick={() => handleManualSidebarChange("map")}
                 className="w-10 h-10"
               >
-                <Database className="h-4 w-4" />
+                <Map className="h-4 w-4" />
               </Button>
             </Tooltip>
           </div>
@@ -841,6 +842,13 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+            
+            {/* Price Heatmap Page */}
+            {sidebarMode === "map" && (
+              <div className="h-full flex flex-col overflow-hidden">
+                <HeatmapView />
               </div>
             )}
             
