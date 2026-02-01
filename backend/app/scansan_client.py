@@ -3,6 +3,7 @@ import asyncio
 import hashlib
 import time
 from typing import Any, Optional
+import re
 import httpx
 from .config import get_settings
 from .schemas import ResolvedLocation, Neighbor
@@ -79,7 +80,8 @@ class ScanSanClient:
     ) -> Optional[dict]:
         """Make API request with retries."""
         if not self.use_api:
-            print(f"[SCANSAN] ERROR: API disabled. Set USE_SCANSAN=true in .env")
+            # Offline mode: return None and let higher-level helpers provide fallbacks.
+            print("[SCANSAN] API disabled (USE_SCANSAN=false). Using offline fallbacks where possible.")
             return None
         
         # Check cache
@@ -90,6 +92,7 @@ class ScanSanClient:
             return cached
         
         client = await self._get_client()
+        endpoint = self._normalize_endpoint(endpoint)
         last_error = None
         
         for attempt in range(retries):
@@ -117,11 +120,55 @@ class ScanSanClient:
         
         print(f"[SCANSAN] API error after {retries} attempts: {last_error}")
         return None
+
+    def _normalize_endpoint(self, endpoint: str) -> str:
+        """
+        Normalize endpoint path so we don't accidentally hit /v1/v1/... .
+
+        The ScanSan docs use paths like `/v1/...` (see:
+        `https://docs.scansan.com/v1/docs#tag/area-code/GET/v1/area_codes/{area_code}/summary`).
+
+        In this repo, `SCANSAN_BASE_URL` may be configured as either:
+        - `https://api.scansan.com`
+        - `https://api.scansan.com/v1`
+
+        We accept either, and ensure the final request path is correct.
+        """
+        base = (self.base_url or "").rstrip("/")
+        ep = (endpoint or "").strip()
+        if not ep.startswith("/"):
+            ep = "/" + ep
+
+        # If base already ends with /v1 and endpoint also starts with /v1/, strip one.
+        if base.endswith("/v1") and ep.startswith("/v1/"):
+            return ep[len("/v1"):]
+
+        return ep
     
     async def search_area_codes(self, query: str) -> Optional[ResolvedLocation]:
         """Search for area codes matching query."""
         print(f"[SCANSAN] GET /v1/area_codes/search?area_name={query}")
         data = await self._request("GET", "/v1/area_codes/search", {"area_name": query})
+
+        # Offline fallback: if ScanSan is disabled, still resolve common UK postcodes/outward codes
+        if data is None and not self.use_api:
+            raw = (query or "").strip().upper()
+            if not raw:
+                return None
+
+            # Prefer outward code if full postcode supplied (e.g. "SW1A 2TL" -> "SW1A")
+            outward = raw.split()[0]
+
+            # Very lightweight outward-code validation:
+            # Examples: NW1, E14, SW1A, EC2A, W1, SE1
+            if re.fullmatch(r"[A-Z]{1,2}\d{1,2}[A-Z]?", outward):
+                return ResolvedLocation(
+                    area_code=outward,
+                    area_code_district=outward,
+                    display_name=outward,
+                    lat=None,
+                    lon=None,
+                )
         
         if data and "data" in data and len(data["data"]) > 0:
             # data[0] is an array of area code objects
@@ -154,6 +201,14 @@ class ScanSanClient:
         """Get summary statistics for area code."""
         print(f"[SCANSAN] GET /v1/area_codes/{area_code}/summary")
         data = await self._request("GET", f"/v1/area_codes/{area_code}/summary")
+
+        # Offline fallback
+        if data is None and not self.use_api:
+            return {
+                "median_rent": None,
+                "avg_rent": None,
+                "listing_count": None,
+            }
         
         if data and "data" in data:
             print(f"[SCANSAN] Summary data found for {area_code}")
