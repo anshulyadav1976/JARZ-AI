@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import type { Message } from "@/components/ChatMessage";
 import type { A2UIMessage, A2UIComponent, StreamState } from "@/lib/types";
+import { getProfileForApi } from "@/lib/profile";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -370,6 +371,7 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamResu
           message: messageContent,
           history: historyRef.current.slice(0, -1), // Exclude current message
           conversation_id: conversationIdToSend,
+          profile: getProfileForApi() ?? undefined,
         }),
         signal: controller.signal,
       })

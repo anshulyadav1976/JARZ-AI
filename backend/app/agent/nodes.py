@@ -328,11 +328,31 @@ async def chat_node(state: ChatAgentState) -> dict[str, Any]:
                 content_preview = content[:100] if content else "[no content]"
                 print(f"[CHAT_NODE] Message {i}: role={role}, content_len={len(content or '')}, preview={content_preview}")
         
-        # Add system prompt if not present
+        # Add system prompt if not present (optionally with user profile for personalisation)
         if not messages or messages[0].get("role") != "system":
+            system_content = SYSTEM_PROMPT
+            profile = state.get("profile")
+            if profile and isinstance(profile, dict):
+                parts = ["USER CONTEXT (use to personalise replies; keep it light):"]
+                if profile.get("name"):
+                    parts.append(f"- Name: {profile['name']}")
+                if profile.get("role"):
+                    role = profile["role"]
+                    role_desc = {"investor": "investor / buy-to-let", "property_agent": "property agent", "individual": "individual looking for a property"}.get(role, role)
+                    parts.append(f"- Role: {role_desc}")
+                if profile.get("bio"):
+                    parts.append(f"- Bio: {profile['bio']}")
+                if profile.get("interests"):
+                    interests = profile["interests"] if isinstance(profile["interests"], list) else []
+                    if interests:
+                        parts.append(f"- Interests: {', '.join(interests)}")
+                if profile.get("preferences"):
+                    parts.append(f"- What they're looking for: {profile['preferences']}")
+                if len(parts) > 1:
+                    system_content = system_content + "\n\n" + "\n".join(parts)
             system_msg: ChatMessage = {
                 "role": "system",
-                "content": SYSTEM_PROMPT,
+                "content": system_content,
             }
             messages = [system_msg] + list(messages)
         

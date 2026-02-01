@@ -14,8 +14,17 @@ import { InvestmentCalculator } from "@/components/InvestmentCalculator";
 import { Tooltip } from "@/components/ui/tooltip-custom";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { BarChart3, Home as HomeIcon, User, TrendingUp, Home as Building, List, Map, Calculator, LineChart, Sparkles, ArrowLeftRight, Database, MessageSquarePlus } from "lucide-react";
+import { BarChart3, Home as HomeIcon, User, TrendingUp, Home as Building, List, Map, Calculator, LineChart, Sparkles, ArrowLeftRight, Database, MessageSquarePlus, UserCircle, Menu } from "lucide-react";
 import { MarketDataPanel } from "@/components/MarketDataPanel";
+import {
+  getProfile,
+  saveProfile,
+  PROFILE_ROLE_LABELS,
+  INTEREST_OPTIONS,
+  type UserProfile,
+  type ProfileRole,
+  type InterestId,
+} from "@/lib/profile";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -44,6 +53,15 @@ export default function Home() {
   const [savedAreas, setSavedAreas] = useState<string[]>([]);
   const [currentArea, setCurrentArea] = useState<string>("");
   const [autoSwitchEnabled, setAutoSwitchEnabled] = useState(true);
+
+  // Profile form state (for Profile tab)
+  const [profileName, setProfileName] = useState("");
+  const [profileRole, setProfileRole] = useState<ProfileRole | "">("");
+  const [profileBio, setProfileBio] = useState("");
+  const [profileInterests, setProfileInterests] = useState<string[]>([]);
+  const [profilePreferences, setProfilePreferences] = useState("");
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
 
   const handleSendMessage = useCallback((message: string) => {
     sendMessage(message);
@@ -75,6 +93,38 @@ export default function Home() {
   const handleLoadConversation = useCallback((id: string) => {
     loadConversation(id);
   }, [loadConversation]);
+
+  // Load profile from localStorage when opening Profile tab
+  useEffect(() => {
+    if (activeTab === "profile") {
+      const p = getProfile();
+      setProfileName(p?.name ?? "");
+      setProfileRole((p?.role as ProfileRole) ?? "");
+      setProfileBio(p?.bio ?? "");
+      setProfileInterests(p?.interests ?? []);
+      setProfilePreferences(p?.preferences ?? "");
+      setProfileSaved(false);
+    }
+  }, [activeTab]);
+
+  const handleProfileSave = useCallback(() => {
+    const profile: UserProfile = {
+      name: profileName.trim() || null,
+      role: profileRole || null,
+      bio: profileBio.trim() || null,
+      interests: profileInterests.length ? profileInterests : null,
+      preferences: profilePreferences.trim() || null,
+    };
+    saveProfile(profile);
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2000);
+  }, [profileName, profileRole, profileBio, profileInterests, profilePreferences]);
+
+  const toggleProfileInterest = useCallback((id: InterestId) => {
+    setProfileInterests((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
 
   // Fetch conversation list (on mount and when current conversation changes so new chats appear)
   useEffect(() => {
@@ -280,6 +330,19 @@ export default function Home() {
       <header className="flex-shrink-0 border-b bg-card/80 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60">
         <div className="w-full flex h-16 items-center justify-between px-6 max-w-full">
           <div className="flex items-center gap-3">
+            {activeTab === "home" && (
+              <Tooltip content={chatHistoryOpen ? "Close chat history" : "Open chat history"} side="right">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setChatHistoryOpen((o) => !o)}
+                  className="w-9 h-9 shrink-0"
+                  aria-label={chatHistoryOpen ? "Close chat history" : "Open chat history"}
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </Tooltip>
+            )}
             <div className="flex items-center justify-center w-7 h-7">
               <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M4 24L14 4L24 24H4Z" fill="currentColor" className="text-foreground"/>
@@ -300,6 +363,15 @@ export default function Home() {
               <span className="hidden sm:inline">Home</span>
             </Button>
             <Button
+              variant={activeTab === "profile" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("profile")}
+              className="gap-2"
+            >
+              <UserCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Profile</span>
+            </Button>
+            <Button
               variant={activeTab === "about" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setActiveTab("about")}
@@ -312,8 +384,82 @@ export default function Home() {
         </div>
       </header>
 
+      {activeTab === "profile" ? (
+        <div className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto">
+          <h2 className="text-xl font-semibold mb-4">Your profile</h2>
+          <p className="text-muted-foreground text-sm mb-6">
+            This helps RentRadar personalise replies. Your name, role and interests are only used in the chat and are not stored on our servers.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium block mb-1">Name</label>
+              <input
+                type="text"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                placeholder="e.g. Alex"
+                className="w-full h-9 px-3 rounded-md border bg-background text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">I am a</label>
+              <select
+                value={profileRole}
+                onChange={(e) => setProfileRole(e.target.value as ProfileRole | "")}
+                className="w-full h-9 px-3 rounded-md border bg-background text-sm"
+                aria-label="Profile role"
+              >
+                <option value="">— Select —</option>
+                {(Object.entries(PROFILE_ROLE_LABELS) as [ProfileRole, string][]).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Short bio (optional)</label>
+              <textarea
+                value={profileBio}
+                onChange={(e) => setProfileBio(e.target.value)}
+                placeholder="A sentence about you"
+                rows={2}
+                className="w-full px-3 py-2 rounded-md border bg-background text-sm resize-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-2">Interests (tick what matters to you)</label>
+              <div className="flex flex-wrap gap-3">
+                {INTEREST_OPTIONS.map(({ id, label }) => (
+                  <label key={id} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={profileInterests.includes(id)}
+                      onChange={() => toggleProfileInterest(id)}
+                      className="rounded border"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">What I&apos;m looking for (optional)</label>
+              <textarea
+                value={profilePreferences}
+                onChange={(e) => setProfilePreferences(e.target.value)}
+                placeholder="e.g. First buy in London, 2-bed, budget around £400k"
+                rows={2}
+                className="w-full px-3 py-2 rounded-md border bg-background text-sm resize-none"
+              />
+            </div>
+            <Button onClick={handleProfileSave} className="mt-4">
+              {profileSaved ? "Saved" : "Save profile"}
+            </Button>
+          </div>
+        </div>
+      ) : (
       <div className="flex-1 flex overflow-hidden w-full min-w-0 min-h-0">
-        {/* Chat history sidebar: New chat + past conversations */}
+        {/* Chat history sidebar: only when hamburger is toggled */}
+        {chatHistoryOpen && (
         <div className="w-52 flex-shrink-0 border-r bg-muted/30 flex flex-col overflow-hidden">
           <div className="p-2 border-b flex-shrink-0">
             <Button
@@ -351,10 +497,10 @@ export default function Home() {
             )}
           </div>
         </div>
+        )}
 
-        {/* Icon sidebar - only show after user sends first message */}
-        {state.messages.length > 0 && (
-          <div className="w-14 flex-shrink-0 border-r bg-card/50 flex flex-col items-center justify-start py-3 gap-1.5">
+        {/* Icon sidebar - always visible for switching features */}
+        <div className="w-14 flex-shrink-0 border-r bg-card/50 flex flex-col items-center justify-start py-3 gap-1.5">
             <Tooltip content="Valuation & Insights" side="right">
               <Button
                 variant={sidebarMode === "valuation" ? "secondary" : "ghost"}
@@ -416,7 +562,6 @@ export default function Home() {
               </Button>
             </Tooltip>
           </div>
-        )}
 
         {/* Chat Panel */}
         <div className={`flex-shrink min-w-0 border-r transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "w-full md:w-[45%] lg:w-[38%]" : "w-full"}`}>
@@ -739,6 +884,7 @@ export default function Home() {
           </div>
         )}
       </div>
+      )}
 
       <footer className="flex-shrink-0 border-t bg-card/80 backdrop-blur">
         <div className="w-full px-6 py-3 max-w-full">

@@ -22,11 +22,21 @@ from .agent.tools import execute_compare_areas
 
 
 # Request models for chat API
+class UserProfile(BaseModel):
+    """Optional user profile for personalisation (injected into system prompt)."""
+    name: Optional[str] = None
+    role: Optional[str] = None  # "investor" | "property_agent" | "individual"
+    bio: Optional[str] = None
+    interests: Optional[list[str]] = None  # e.g. sustainability, investment_returns, location_comparison
+    preferences: Optional[str] = None  # free text: what they're looking for
+
+
 class ChatRequest(BaseModel):
     """Request for chat endpoint."""
     message: str
     history: Optional[list[dict]] = None
     conversation_id: Optional[str] = None
+    profile: Optional[UserProfile] = None
 
 
 class CompareAreasRequest(BaseModel):
@@ -388,10 +398,19 @@ async def chat_endpoint(request: ChatRequest) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _profile_to_dict(profile: Optional[UserProfile]) -> Optional[dict]:
+    """Convert UserProfile to dict for agent state."""
+    if not profile:
+        return None
+    d = profile.model_dump(exclude_none=True)
+    return d if d else None
+
+
 async def generate_chat_sse_events(
     message: str,
     history: list[ChatMessage] = None,
     conversation_id: Optional[str] = None,
+    profile: Optional[dict] = None,
 ) -> AsyncGenerator[dict, None]:
     """Generate SSE events from chat agent execution. Persists to DB and emits conversation_id on complete."""
     history = history or []
@@ -409,7 +428,7 @@ async def generate_chat_sse_events(
     a2ui_for_save: list = []
 
     try:
-        async for event in stream_chat_agent(message, history):
+        async for event in stream_chat_agent(message, history, profile=profile):
             event_type = event.get("type", "unknown")
             
             if event_type == "node":
@@ -542,8 +561,9 @@ async def chat_stream_endpoint(request: ChatRequest):
                 "name": msg.get("name"),
             })
     
+    profile_dict = _profile_to_dict(request.profile)
     return EventSourceResponse(
-        generate_chat_sse_events(request.message, history, request.conversation_id),
+        generate_chat_sse_events(request.message, history, request.conversation_id, profile=profile_dict),
         media_type="text/event-stream",
     )
 

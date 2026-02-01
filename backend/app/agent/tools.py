@@ -3,6 +3,7 @@ Agent tools for the chat-based LangGraph agent.
 
 These tools allow the LLM to interact with the rental valuation system.
 The LLM decides when to call these tools based on user queries.
+Tool results are cached so repeated requests (same args) return fast for demos.
 """
 import re
 from typing import Any, Optional
@@ -14,6 +15,7 @@ from ..model_adapter import get_model_adapter
 from ..explain import explain_prediction
 from ..a2ui_builder import build_complete_ui, build_listings_cards, build_location_comparison_ui
 from ..scansan_client import get_scansan_client
+from .. import cache as tool_cache
 
 
 @dataclass
@@ -1137,9 +1139,15 @@ async def execute_get_market_data(location: str) -> dict[str, Any]:
     }
 
 
+def _cache_key(tool_name: str, arguments: dict[str, Any]) -> str:
+    """Build a stable cache key for tool + args."""
+    return tool_cache._make_key("tool", tool_name, arguments)
+
+
 async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Execute a tool by name with given arguments.
+    Results are cached so repeated calls with same args return fast (for demos).
     
     Args:
         tool_name: Name of the tool to execute
@@ -1148,13 +1156,18 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
     Returns:
         Tool execution result as a dict
     """
+    cache_key = _cache_key(tool_name, arguments)
+    cached = tool_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     if tool_name == "get_rent_forecast":
         result = await execute_get_rent_forecast(
             location=arguments["location"],
             horizon_months=arguments.get("horizon_months", 6),
             k_neighbors=arguments.get("k_neighbors", 5),
         )
-        return {
+        out = {
             "success": True,
             "prediction": result.prediction,
             "explanation": result.explanation,
@@ -1163,17 +1176,21 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             "a2ui_messages": result.a2ui_messages,
             "summary": result.summary,
         }
-    
+        tool_cache.set_(cache_key, out)
+        return out
+
     elif tool_name == "search_location":
         result = await execute_search_location(
             query=arguments["query"]
         )
-        return {
+        out = {
             "success": result.found,
             "location": result.location,
             "message": result.message,
         }
-    
+        tool_cache.set_(cache_key, out)
+        return out
+
     elif tool_name == "compare_areas":
         result = await execute_compare_areas(
             location1=arguments.get("location1"),
@@ -1181,14 +1198,15 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             areas=arguments.get("areas"),
             horizon_months=arguments.get("horizon_months", 6),
         )
+        tool_cache.set_(cache_key, result)
         return result
-    
+
     elif tool_name == "get_embodied_carbon":
         result = await execute_get_embodied_carbon(
             location=arguments["location"],
             property_type=arguments.get("property_type", "flat"),
         )
-        return {
+        out = {
             "success": result.success,
             "location": result.location,
             "current_emissions": result.current_emissions,
@@ -1201,14 +1219,16 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             "a2ui_messages": result.a2ui_messages,
             "summary": result.summary,
         }
-    
+        tool_cache.set_(cache_key, out)
+        return out
+
     elif tool_name == "get_property_listings":
         result = await execute_get_property_listings(
             location=arguments["location"],
             listing_types=arguments.get("listing_types", ["rent", "sale"]),
             include_amenities=arguments.get("include_amenities", True),
         )
-        return {
+        out = {
             "success": result.success,
             "location": result.location,
             "area_code": result.area_code,
@@ -1218,7 +1238,9 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             "a2ui_messages": result.a2ui_messages,
             "summary": result.summary,
         }
-    
+        tool_cache.set_(cache_key, out)
+        return out
+
     elif tool_name == "get_investment_analysis":
         from .investment import execute_get_investment_analysis
         result = await execute_get_investment_analysis(
@@ -1228,7 +1250,7 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             mortgage_rate=arguments.get("mortgage_rate", 4.5),
             mortgage_years=arguments.get("mortgage_years", 25),
         )
-        return {
+        out = {
             "success": result.success,
             "location": result.location,
             "property_value": result.property_value,
@@ -1246,9 +1268,13 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             "a2ui_messages": result.a2ui_messages,
             "summary": result.summary,
         }
-    
+        tool_cache.set_(cache_key, out)
+        return out
+
     elif tool_name == "get_market_data":
-        return await execute_get_market_data(location=arguments["location"])
+        out = await execute_get_market_data(location=arguments["location"])
+        tool_cache.set_(cache_key, out)
+        return out
     
     else:
         return {
