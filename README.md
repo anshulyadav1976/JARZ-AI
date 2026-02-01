@@ -183,7 +183,7 @@ We train separate models for \(q \in \{0.1, 0.5, 0.9\}\) → **P10/P50/P90**.
 We capture neighborhood effects by averaging neighbor signals:
 
 $$
-\mathrm{spatial\_rent\_neighbor\_avg}=\frac{1}{K}\sum_{i=1}^{K}\mathrm{rent}_i
+\mathrm{spatial\_rent\_neighbor\_avg}=\frac{1}{K}\sum_{i=1}^{K}\mathrm{rent}_{i}
 $$
 
 ### Explainability (SHAP)
