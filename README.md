@@ -7,7 +7,7 @@ RentRadar is a **chat-first UK property assistant**. You type questions, the age
 ```mermaid
 flowchart LR
   FE[Next.js Frontend] -->|SSE POST /api/chat/stream| BE[FastAPI Backend]
-  BE -->|OpenRouter| LLM[LLM]
+  BE -->|OpenRouter - OpenAI compatible| LLM[LLM]
   BE -->|optional| SS[ScanSan API]
   BE --> DB[(SQLite chat.db)]
   BE --> C[(backend/cache.json)]
@@ -23,16 +23,16 @@ More diagrams and flows: `docs/architecture.md`
 ```mermaid
 sequenceDiagram
   participant U as User
-  participant FE as Frontend (Next.js)
-  participant BE as Backend (FastAPI)
+  participant FE as Frontend - Next.js
+  participant BE as Backend - FastAPI
   participant LG as LangGraph Chat Graph
-  participant LLM as LLM (OpenRouter)
-  participant SS as ScanSan (optional)
-  participant DB as SQLite (chat.db)
-  participant C as Cache (backend/cache.json)
+  participant LLM as LLM - OpenRouter
+  participant SS as ScanSan - optional
+  participant DB as SQLite - chat.db
+  participant C as Cache - backend/cache.json
 
   U->>FE: types a message
-  FE->>BE: POST /api/chat/stream (SSE)
+  FE->>BE: POST /api/chat/stream - SSE
   BE->>DB: persist user message
   BE->>LG: stream_chat_agent(messages, tools)
   LG->>LLM: system prompt + tool schemas
@@ -57,12 +57,12 @@ sequenceDiagram
 
 ```mermaid
 flowchart TB
-  FE[MarketDataPanel] -->|GET /api/district/{district}/growth| BE
-  FE -->|GET /api/district/{district}/rent/demand| BE
-  FE -->|GET /api/district/{district}/sale/demand| BE
-  FE -->|GET /api/postcode/{postcode}/valuations/current| BE
-  FE -->|GET /api/postcode/{postcode}/valuations/historical| BE
-  FE -->|GET /api/postcode/{postcode}/sale/history| BE
+  FE[MarketDataPanel] -->|GET /api/district/:district/growth| BE
+  FE -->|GET /api/district/:district/rent/demand| BE
+  FE -->|GET /api/district/:district/sale/demand| BE
+  FE -->|GET /api/postcode/:postcode/valuations/current| BE
+  FE -->|GET /api/postcode/:postcode/valuations/historical| BE
+  FE -->|GET /api/postcode/:postcode/sale/history| BE
   BE -->|ScanSanClient| SS[ScanSan API]
   BE -->|persistent JSON TTL| C[(backend/cache.json)]
   BE -->|JSON| FE
