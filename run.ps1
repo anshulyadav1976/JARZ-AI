@@ -1,11 +1,24 @@
 # JARZ-AI - Start Script
-# Runs both backend and frontend servers
+# Installs deps (if needed) and runs both backend + frontend servers.
+#
+# Usage:
+#   .\run.ps1
+#   .\run.ps1 -BackendPort 8000 -FrontendPort 3000
+#   .\run.ps1 -SkipInstall
+#   .\run.ps1 -NoBrowser
+
+param(
+    [int]$BackendPort = 8000,
+    [int]$FrontendPort = 3000,
+    [switch]$SkipInstall,
+    [switch]$NoBrowser
+)
 
 Write-Host "Starting JARZ-AI..." -ForegroundColor Cyan
 Write-Host ""
 
-# Free ports 8000 and 3000 before starting
-Write-Host "Checking and freeing ports 8000 and 3000..." -ForegroundColor Yellow
+# Free ports before starting
+Write-Host "Checking and freeing ports $BackendPort and $FrontendPort..." -ForegroundColor Yellow
 
 function Stop-ProcessesOnPort {
     param([Parameter(Mandatory=$true)][int]$Port)
@@ -57,49 +70,114 @@ function Stop-ProcessesOnPort {
     }
 }
 
-Stop-ProcessesOnPort -Port 8000
-Stop-ProcessesOnPort -Port 3000
+Stop-ProcessesOnPort -Port $BackendPort
+Stop-ProcessesOnPort -Port $FrontendPort
 Start-Sleep -Seconds 1
 
-# Activate Python virtual environment (if exists)
-Write-Host "Activating Python environment..." -ForegroundColor Yellow
-$venvCandidates = @(
-    "$PSScriptRoot\.venv\Scripts\Activate.ps1",
-    "$PSScriptRoot\backend\venv\Scripts\Activate.ps1",
-    "$PSScriptRoot\backend\.venv\Scripts\Activate.ps1"
-)
-$activated = $false
-foreach ($path in $venvCandidates) {
-    if (Test-Path $path) {
-        & $path
-        $activated = $true
-        Write-Host "Activated venv at $path" -ForegroundColor Green
-        break
-    }
+# -----------------------------------------------------------------------------
+# Backend setup (venv + pip install)
+# -----------------------------------------------------------------------------
+$backendDir = Join-Path $PSScriptRoot "backend"
+$backendReq = Join-Path $backendDir "requirements.txt"
+$backendEnvExample = Join-Path $backendDir ".env.example"
+$backendEnv = Join-Path $backendDir ".env"
+$venvDir = Join-Path $backendDir "venv"
+$activatePath = Join-Path $venvDir "Scripts\Activate.ps1"
+
+if (-not (Test-Path $backendDir)) {
+    Write-Host "Backend directory not found: $backendDir" -ForegroundColor Red
+    exit 1
 }
-if (-not $activated) {
-    Write-Host "No Python virtual environment found. Tried:" -ForegroundColor Red
-    $venvCandidates | ForEach-Object { Write-Host " - $_" -ForegroundColor Red }
+
+if (-not $SkipInstall) {
+    # Create backend/.env if missing (keeps placeholders; user should edit API keys)
+    if ((Test-Path $backendEnvExample) -and (-not (Test-Path $backendEnv))) {
+        Copy-Item $backendEnvExample $backendEnv -Force
+        Write-Host "Created backend/.env from backend/.env.example (edit keys inside)." -ForegroundColor Yellow
+    }
+
+    # Create venv if missing
+    if (-not (Test-Path $activatePath)) {
+        Write-Host "Creating Python venv in backend/venv..." -ForegroundColor Yellow
+        Push-Location $backendDir
+        python -m venv venv
+        Pop-Location
+    }
+
+    # Activate venv in this shell for installs
+    if (Test-Path $activatePath) {
+        Write-Host "Activating Python venv..." -ForegroundColor Yellow
+        & $activatePath
+        Write-Host "Installing backend Python dependencies..." -ForegroundColor Yellow
+        Push-Location $backendDir
+        pip install -r $backendReq
+        Pop-Location
+    } else {
+        Write-Host "Could not find venv activate script: $activatePath" -ForegroundColor Red
+        exit 1
+    }
+} else {
+    Write-Host "SkipInstall set: skipping backend dependency installation." -ForegroundColor Yellow
+}
+
+# -----------------------------------------------------------------------------
+# Frontend setup (npm install)
+# -----------------------------------------------------------------------------
+$frontendDir = Join-Path $PSScriptRoot "frontend"
+$frontendEnvExample = Join-Path $frontendDir ".env.example"
+$frontendEnvLocal = Join-Path $frontendDir ".env.local"
+$nodeModules = Join-Path $frontendDir "node_modules"
+
+if (-not (Test-Path $frontendDir)) {
+    Write-Host "Frontend directory not found: $frontendDir" -ForegroundColor Red
+    exit 1
+}
+
+if (-not $SkipInstall) {
+    # Create frontend/.env.local if missing
+    if ((Test-Path $frontendEnvExample) -and (-not (Test-Path $frontendEnvLocal))) {
+        Copy-Item $frontendEnvExample $frontendEnvLocal -Force
+        # Ensure it points to our backend port (best-effort).
+        (Get-Content $frontendEnvLocal) `
+            -replace '^NEXT_PUBLIC_API_URL=.*$', "NEXT_PUBLIC_API_URL=http://localhost:$BackendPort" `
+            | Set-Content $frontendEnvLocal
+        Write-Host "Created frontend/.env.local from frontend/.env.example." -ForegroundColor Yellow
+    }
+
+    if (-not (Test-Path $nodeModules)) {
+        Write-Host "Installing frontend dependencies (npm install)..." -ForegroundColor Yellow
+        Push-Location $frontendDir
+        npm install
+        Pop-Location
+    } else {
+        Write-Host "Frontend node_modules already present (skipping npm install)." -ForegroundColor Green
+    }
+} else {
+    Write-Host "SkipInstall set: skipping frontend dependency installation." -ForegroundColor Yellow
 }
 
 # Start backend in a new PowerShell window
-Write-Host "Starting backend server (port 8000)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\backend'; if (Test-Path '$PSScriptRoot\.venv\Scripts\Activate.ps1') { & '$PSScriptRoot\.venv\Scripts\Activate.ps1' } elseif (Test-Path '$PSScriptRoot\backend\venv\Scripts\Activate.ps1') { & '$PSScriptRoot\backend\venv\Scripts\Activate.ps1' } elseif (Test-Path '$PSScriptRoot\backend\.venv\Scripts\Activate.ps1') { & '$PSScriptRoot\backend\.venv\Scripts\Activate.ps1' }; python -m uvicorn app.main:app --reload --port 8000"
+Write-Host "Starting backend server (port $BackendPort)..." -ForegroundColor Yellow
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$backendDir'; if (Test-Path '$activatePath') { & '$activatePath' }; python -m uvicorn app.main:app --reload --port $BackendPort"
 
 # Wait a moment for backend to initialize
 Start-Sleep -Seconds 2
 
 # Start frontend in a new PowerShell window
-Write-Host "Starting frontend server (port 3000)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\frontend'; npm run dev"
+Write-Host "Starting frontend server (port $FrontendPort)..." -ForegroundColor Yellow
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$frontendDir'; `$env:PORT=$FrontendPort; npm run dev"
 
 Write-Host 
-Write-Host "✓ Backend running on http://127.0.0.1:8000" -ForegroundColor Green
-Write-Host "✓ Frontend running on http://localhost:3000" -ForegroundColor Green
+Write-Host "✓ Backend running on http://127.0.0.1:$BackendPort" -ForegroundColor Green
+Write-Host "✓ Frontend running on http://localhost:$FrontendPort" -ForegroundColor Green
 Write-Host ""
 Write-Host "Press Ctrl+C in each window to stop the servers" -ForegroundColor Cyan
-Write-Host "Opening app in browser..." -ForegroundColor Cyan
 
 # Wait for frontend to start, then open browser
-Start-Sleep -Seconds 5
-Start-Process "http://localhost:3000"
+if (-not $NoBrowser) {
+    Write-Host "Opening app in browser..." -ForegroundColor Cyan
+    Start-Sleep -Seconds 5
+    Start-Process "http://localhost:$FrontendPort"
+} else {
+    Write-Host "NoBrowser set: not opening a browser automatically." -ForegroundColor Yellow
+}

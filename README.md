@@ -1,177 +1,164 @@
 # JARZ-AI (RentRadar) — Spatio‑Temporal Rental Valuation (Hackathon)
 
-This repo contains a **FastAPI + LangGraph** backend and a **Next.js** frontend.
+RentRadar is a **chat-first UK property assistant**. You type questions, the agent calls tools (market data, listings, valuation/investment calculations), and the UI updates live via **A2UI** streamed over **SSE**.
 
-The UX is a **chat interface**. As the user chats, the LLM agent can call tools (e.g. `get_rent_forecast`) and stream:
-- **assistant text** into the chat panel
-- **A2UI (Agent→UI) messages** into the insights side panel
+## What you can demo in 60 seconds
 
-> Important: Model code here is intentionally **PLACEHOLDER** (stub/pickle/http adapters). A teammate will swap in the real trained model later.
-anshul is a good boy
-## Repo layout (actual)
+- Ask: “What’s the rent forecast for `NW1`?”
+  - You get: **P10/P50/P90** forecast + drivers + charts + neighborhood context.
+- Ask: “Give me market data for `NW1 0BJ`”
+  - You get: growth trend, rent/sale demand, valuations + sale history, with export.
+- Ask: “Compare `NW1` vs `E14`”
+  - You get: side-by-side summary, ranges, and listings comparison.
 
-- `plan.md`: Hackathon plan (single source of truth — don’t edit unless explicitly intended)
-- `run.ps1`: **PowerShell startup script** — runs backend + frontend with one command
-- `backend/`: FastAPI API + LangGraph agents
-  - `backend/app/main.py`: API routes + SSE streaming endpoints
-  - `backend/app/agent/`: LangGraph graphs/nodes/state + tool definitions
-  - `backend/app/model_adapter.py`: placeholder model adapters (stub/pickle/http)
-  - `backend/app/a2ui_builder.py`: builds A2UI messages for the frontend to render
-  - `backend/app/config.py`: environment configuration
-  - `backend/app/llm_client.py`: OpenRouter LLM integration
-  - `backend/app/scansan_client.py`: ScanSan property data API
-- `frontend/`: Next.js app (chat + A2UI renderer)
-  - `frontend/app/page.tsx`: main app with 5-page sidebar navigation
-  - `frontend/hooks/useChatStream.ts`: consumes backend SSE `/api/chat/stream`
-  - `frontend/components/A2UIRenderer.tsx`: maps A2UI components → React components
-  - `frontend/components/`: visualization components
-    - `SummaryCard.tsx`: P10/P50/P90 rental forecast display
-    - `RentForecastChart.tsx`: 12-month trend chart
-    - `DriversBar.tsx`: factor contribution bars
-    - `NeighbourHeatmapMap.tsx`: spatial neighboring areas
-    - `WhatIfControls.tsx`: scenario modeling inputs
-    - `InsightsActions.tsx`: print/export/share/save buttons
-    - `BudgetFilter.tsx`: search by budget and bedrooms
-    - `ComparisonMode.tsx`: compare up to 3 areas
-    - `InvestmentCalculator.tsx`: rental yield and ROI calculations
-    - `InsightsDisclaimer.tsx`: data freshness and legal disclaimer
-    - `ui/tooltip-custom.tsx`: custom hover tooltips
+## Architecture (at a glance)
 
-## Quickstart (Windows / PowerShell)
+```mermaid
+flowchart LR
+  FE[Next.js Frontend] -->|SSE POST /api/chat/stream| BE[FastAPI Backend]
+  BE -->|OpenRouter| LLM[LLM]
+  BE -->|optional| SS[ScanSan API]
+  BE --> DB[(SQLite chat.db)]
+  BE --> C[(backend/cache.json)]
+  BE -->|SSE: text + a2ui| FE
+```
+
+More diagrams and flows: `docs/architecture.md`
+
+## Key features
+
+- **Chat + streaming UI**: assistant text + UI updates stream live (SSE).
+- **A2UI (Agent→UI)**: the agent can render charts/cards/tables on the right panel.
+- **Market Data tab**:
+  - growth trend (district)
+  - rent demand + sales demand (district)
+  - current + historical valuations (postcode)
+  - sale history table + export (postcode)
+- **Property Finder**: rent + sale listings, optional Mapbox map view.
+- **Location comparison**: compare 2–3 locations (summary + ranges + listings).
+- **Profile personalization**: user profile is injected into the system prompt.
+- **Demo‑grade caching**: tool + ScanSan responses cached to `backend/cache.json` (persists across restarts).
+- **Chat history persistence**: SQLite (`backend/app/chat.db` by default) with UI snapshot replay.
+
+## Repo layout
+
+- `run.ps1`: one-command **install + run** script for judges (Windows/PowerShell)
+- `backend/`: FastAPI + LangGraph + caching + SQLite history
+  - `backend/app/main.py`: API routes (chat stream, market data, conversations)
+  - `backend/app/agent/`: LangGraph graphs/nodes/state + tools
+  - `backend/app/scansan_client.py`: ScanSan client + persistent API caching
+  - `backend/app/cache.py`: persistent JSON TTL cache (`backend/cache.json`)
+  - `backend/app/db.py`: SQLite chat history (`backend/app/chat.db`)
+- `frontend/`: Next.js app (chat + A2UI renderer + tabs)
+  - `frontend/app/page.tsx`: main layout + tab navigation
+  - `frontend/hooks/useChatStream.ts`: SSE client + A2UI state
+  - `frontend/components/A2UIRenderer.tsx`: A2UI component registry
+- `api-1.json`: ScanSan OpenAPI spec used as a data source reference
+- `notebooks/train_model_explained.ipynb`: maths + ML pipeline explanation (with plots)
+- `models/`, `investment_model/`: model development docs/code
+- `docs/`: architecture + API reference docs
+- `AGENTS.md`: teammate/coding-agent rules to avoid breaking the demo
+
+## Quickstart (Windows / PowerShell) — judges-friendly
 
 ### Prereqs
 
-- Python **3.11 or 3.12 recommended** (Python 3.14 may show dependency warnings)
-- Node.js **18+** (20+ OK)
+- Python **3.11 or 3.12 recommended**
+  - Python 3.14 may show dependency warnings (some libs still catching up).
+- Node.js **18+**
 
-### Quick Start (Recommended)
+### 1) Configure environment
 
-**Use the automated startup script:**
+Backend:
+
+```powershell
+copy backend\.env.example backend\.env
+notepad backend\.env
+```
+
+Frontend:
+
+```powershell
+copy frontend\.env.example frontend\.env.local
+notepad frontend\.env.local
+```
+
+Optional map view: see `frontend/MAPBOX_SETUP.md`.
+
+### 2) Install + run everything
 
 ```powershell
 .\run.ps1
 ```
 
 This script will:
-1. Activate the Python virtual environment
-2. Start the backend server on port 8000
-3. Start the frontend dev server on port 3000
-4. Open your browser to `http://localhost:3000`
+- create a python venv (if missing) + `pip install -r requirements.txt`
+- run `npm install` (if missing) + start Next.js
+- start backend on `:8000` and frontend on `:3000`
 
-**Requirements before running:**
-- Backend virtual environment set up (see Manual Setup below)
-- Frontend dependencies installed (`npm install` in frontend/)
-- Environment variables configured (see Backend/Frontend environment sections below)
+Open: `http://localhost:3000`
 
----
+## Demo scripts (copy/paste prompts)
 
-### Manual Setup (Alternative)
+- “What’s the rent forecast for `E14` over 12 months?”
+- “Give me market data on postcode `NW1 0BJ`.”
+- “Compare `NW1` vs `E14` and tell me which is better for renting out.”
+- “Show me properties for rent in `SW1`.”
+- “What’s the embodied carbon / sustainability picture for `SW1A 2AA`?”
 
-If you prefer to set up manually or need to troubleshoot:
+## Maths / ML (from the notebook)
 
-#### 1) Backend setup
+Full derivation + plots: `notebooks/train_model_explained.ipynb`
 
-From repo root:
+### Quantile regression (P10 / P50 / P90)
 
-```powershell
-cd backend
-python -m venv venv
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-```
+We predict quantiles to produce **uncertainty bands** instead of a single number.
 
-#### Backend environment variables
+Pinball (quantile) loss for quantile \(q\):
 
-- Copy `backend/.env.example` → `backend/.env` and fill in values **OR**
-- Put the same variables in repo-root `.env`
+\[
+\rho_q(u) = \begin{cases}
+q \cdot u & \text{if } u \ge 0 \\
+(q - 1)\cdot u & \text{if } u < 0
+\end{cases}
+\]
 
-The backend is configured to load env from both `backend/.env` and repo-root `.env`.
+We train separate models for \(q \in \{0.1, 0.5, 0.9\}\) → **P10/P50/P90**.
 
-Required (for chat LLM):
+### Spatial features (K nearest neighbors)
 
-- `OPENROUTER_API_KEY`
-- `LLM_MODEL` (recommended: `openai/gpt-5-nano`)
-- `LLM_BASE_URL` (recommended: `https://openrouter.ai/api/v1`)
+We capture neighborhood effects by averaging neighbor signals:
 
-Optional:
+\[
+\text{spatial\_rent\_neighbor\_avg}=\frac{1}{K}\sum_{i=1}^{K}\text{rent}_i
+\]
 
-- `USE_SCANSAN=false` for offline/dev mode
-- `SCANSAN_API_KEY` + `SCANSAN_BASE_URL` if you enable ScanSan calls
+### Explainability (SHAP)
 
-#### Run backend
+We use SHAP to attribute how features (demand, growth, neighbor context, etc.) influence predictions.
 
-On Windows, port 8000 can be blocked. We usually run on **8001**:
+## Data sources / APIs used
 
-```powershell
-python -m uvicorn app.main:app --reload --port 8001
-```
+- **ScanSan API** (market + listings + valuations + sale history)
+  - Docs: `https://docs.scansan.com/v1/docs`
+  - OpenAPI spec (used for this repo’s references): `api-1.json`
+  - Key endpoints we use are listed in `docs/api-reference.md`
+- **OpenRouter** (LLM provider; OpenAI-compatible)
+  - API: `https://openrouter.ai/`
+- **Mapbox** (optional map view in Property Finder)
+  - Setup: `frontend/MAPBOX_SETUP.md`
 
-Backend URL: `http://127.0.0.1:8001`
+## Caching + persistence (hackathon stability)
 
-> **Note:** If using `run.ps1`, it starts the backend on port **8000** by default.
+- **Chat history**: persisted to SQLite (`backend/app/chat.db`)
+- **Cache**: persisted to JSON (`backend/cache.json`)
+  - speeds up repeated tool calls and repeated ScanSan requests
+  - survives backend restarts (great for demos)
 
-#### 2) Frontend setup
+## Contributing / teammate safety
 
-In a second terminal:
-
-```powershell
-cd frontend
-npm install
-```
-
-#### Frontend environment variables
-
-Set the backend URL in `frontend/.env.local`:
-
-```
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
-
-#### Run frontend
-
-```powershell
-npm run dev
-```
-
-Frontend URL: `http://localhost:3000`
-
-## How to use (end-to-end)
-
-1. Open `http://localhost:3000`
-2. Ask something like:
-   - “What’s the rent forecast for NW1?”
-   - “Show me a 12‑month forecast for E14”
-3. You should see:
-   - Streaming assistant response in chat
-   - A2UI insights on the right (Summary, Chart, Map, Drivers, etc.)
-
-## API endpoints (backend)
-
-- `POST /api/chat/stream` (SSE): main chat + A2UI streaming endpoint used by the frontend
-- `POST /api/chat`: non-streaming chat (returns full response payload)
-- `POST /api/query`: legacy non-chat “pipeline” endpoint
-- `POST /api/stream`: legacy A2UI streaming endpoint (non-chat)
-
-## Troubleshooting
-
-### “WinError 10013” when starting Uvicorn on port 8000
-
-Use another port (e.g. 8002/5000) and update `frontend/.env.local` accordingly.
-
-### Chat shows no response even though backend returns 200
-
-Common causes:
-- Missing `OPENROUTER_API_KEY` (backend logs show something like `Bearer ` / illegal header)
-- SSE parsing on Windows CRLF (`\r\n`) — frontend parsers must `.trim()` the `data:` payload before `JSON.parse()`
-
-### Don’t commit secrets
-
-Never commit `.env`, `.env.local`, or API keys. Rotate keys if they were ever committed.
-
-## Contributor guide
-
-See `AGENTS.md` for project-specific rules:
-- how to add LangGraph tools safely
-- how to emit A2UI components
-- how the frontend consumes SSE and renders A2UI
-- do/don’t rules to avoid breaking the demo
+Read `AGENTS.md` before making changes. It contains:
+- the SSE contract (backend ↔ frontend)
+- how to add tools to the LangGraph agent
+- how to add new A2UI components and UI panels safely
+- guardrails to avoid merge breakage during demo crunch

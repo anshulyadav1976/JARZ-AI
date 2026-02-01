@@ -6,6 +6,26 @@ The goal is simple: **don’t break the demo** (chat streaming + A2UI side panel
 
 ---
 
+## Mandatory workflow (for coding agents + teammates)
+
+Before changing anything:
+
+1. **Search first**
+   - Find similar code/components before creating new files.
+   - Prefer extending existing tools/components/tabs.
+2. **Document findings**
+   - Existing files touched
+   - What already exists
+   - What’s missing
+   - Proposed approach
+3. **Keep changes small + reviewable**
+   - Avoid “mega refactors” during hackathon crunch.
+4. **Protect the streaming contract**
+   - SSE event names + payloads must stay compatible with `frontend/hooks/useChatStream.ts`.
+   - A2UI component `type` + data-model paths must stay compatible with `frontend/components/A2UIRenderer.tsx`.
+
+---
+
 ## Golden rules (must follow)
 
 1. **Do not edit `plan.md`** unless the human explicitly asks.
@@ -19,6 +39,8 @@ The goal is simple: **don’t break the demo** (chat streaming + A2UI side panel
 5. **Keep the system runnable**:
    - Backend runs on `:8000` by default.
    - Frontend runs on `:3000`.
+6. **Don’t break Windows**
+   - This repo is demoed on Windows frequently. Re-test SSE, path handling, and scripts on Windows.
 
 ---
 
@@ -79,7 +101,11 @@ ScanSan (optional for demo stability):
 Set the backend URL:
 
 - `frontend/.env.local`
-  - `NEXT_PUBLIC_API_URL=http://localhost:8001`
+  - `NEXT_PUBLIC_API_URL=http://localhost:8000`
+
+Optional map view:
+
+- `NEXT_PUBLIC_MAPBOX_TOKEN=pk. ...` (see `frontend/MAPBOX_SETUP.md`)
 
 ---
 
@@ -135,6 +161,10 @@ Most features should be implemented as tools that the LLM can call.
    - Tool execution status is streamed via `tool_start` / `tool_end`.
    - A2UI messages are streamed via the `a2ui` event.
 
+6. **Caching**
+   - Tool calls are cached by `backend/app/cache.py` (persisted to `backend/cache.json`).
+   - If your tool calls ScanSan, the **raw API response** is also cached by `backend/app/scansan_client.py`.
+
 ### Tool return shape guidelines
 
 Recommended keys when a tool generates a valuation:
@@ -175,6 +205,58 @@ If you change *any* of these:
 
 ---
 
+## How to add / modify a UI tab (frontend)
+
+Most top-level UX changes happen in `frontend/app/page.tsx`.
+
+Typical steps:
+
+1. **Add a new sidebar mode**
+   - Update the `sidebarMode` union type in `page.tsx`
+   - Add a new icon button in the icon sidebar
+   - Add a render branch for the panel component
+
+2. **If the agent should open the tab automatically**
+   - Emit an A2UI message from the backend tool (example: `get_market_data`)
+   - Handle it in `frontend/hooks/useChatStream.ts` (see `onMarketDataRequest`)
+   - In `page.tsx`, switch the mode when that callback fires
+
+3. **If the tab needs backend data**
+   - Add a FastAPI route in `backend/app/main.py`
+   - Add the corresponding ScanSan call (if applicable) in `backend/app/scansan_client.py`
+   - Consider caching (enabled by default)
+
+Rule of thumb: don’t add a new tab if an existing one can be extended.
+
+---
+
+## How Market Data works (growth, demand, valuations, sale history)
+
+- **Frontend**
+  - Panel: `frontend/components/MarketDataPanel.tsx`
+  - Visuals: `GrowthChart.tsx`, `RentDemandCard.tsx`, `SaleDemandCard.tsx`, `ValuationsCard.tsx`, `SaleHistoryTable.tsx`
+  - Trigger from agent: `get_market_data` tool emits an A2UI message that switches to the Market Data tab.
+
+- **Backend**
+  - Routes live in `backend/app/main.py` under the “District / Postcode Data” section.
+  - Data comes from `backend/app/scansan_client.py` which wraps ScanSan endpoints.
+
+---
+
+## Chat history persistence (SQLite)
+
+The chat UI persists conversations and messages locally:
+
+- DB module: `backend/app/db.py`
+- Default DB path: `backend/app/chat.db` (override via `CHAT_DB_PATH`)
+- Conversation APIs:
+  - `GET /api/conversations`
+  - `GET /api/conversations/{id}`
+
+Assistant messages can include an `a2ui_snapshot` so the frontend can restore the side panel when reopening a conversation.
+
+---
+
 ## Common safe workflows
 
 ### Backend dev
@@ -190,6 +272,12 @@ python -m uvicorn app.main:app --reload --port 8000
 ```powershell
 cd frontend
 npm run dev
+```
+
+### One-command run (recommended for demos)
+
+```powershell
+.\run.ps1
 ```
 
 ---
@@ -215,4 +303,15 @@ Do not commit:
 - `.env`, `.env.local`
 
 If you see these in `git status`, fix `.gitignore` / remove from tracking before merging.
+
+---
+
+## Before merging / demo checklist
+
+- Backend starts cleanly with `.\run.ps1`
+- Frontend loads `http://localhost:3000` without console errors
+- Chat streaming works (you see `text` events arriving)
+- Market Data tab loads for a postcode (growth + demand + valuations)
+- Comparison still works (`/api/areas/compare`)
+- No secrets in `git status` (no `.env`, no API keys)
 
