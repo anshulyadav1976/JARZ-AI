@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef } from "react";
 import type { Message } from "@/components/ChatMessage";
 import type { A2UIMessage, A2UIComponent, StreamState } from "@/lib/types";
+import { getProfileForApi } from "@/lib/profile";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -26,19 +27,92 @@ interface ChatStreamState {
   error: string | null;
   currentTool: CurrentTool | null;
   streamingContent: string;
+  conversationId: string | null;
+}
+
+export interface MarketDataRequestPayload {
+  district?: string | null;
+  postcode?: string | null;
+}
+
+interface UseChatStreamOptions {
+  onMarketDataRequest?: (data: MarketDataRequestPayload) => void;
 }
 
 interface UseChatStreamResult {
   state: ChatStreamState;
   sendMessage: (message: string) => void;
   reset: () => void;
+  loadConversation: (conversationId: string) => Promise<void>;
+  applyA2UIMessages: (messages: A2UIMessage[]) => void;
 }
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-export function useChatStream(): UseChatStreamResult {
+/** Apply a single A2UI message to a state snapshot (pure). Used to replay saved UI when loading a conversation. */
+function applyOneA2UIMessage(
+  components: Map<string, import("@/lib/types").A2UIComponent>,
+  dataModel: Record<string, unknown>,
+  rootId: string | null,
+  isReady: boolean,
+  message: A2UIMessage
+): { components: Map<string, import("@/lib/types").A2UIComponent>; dataModel: Record<string, unknown>; rootId: string | null; isReady: boolean } {
+  const newComponents = new Map(components);
+  let newDataModel = { ...dataModel };
+  let newRootId = rootId;
+  let newIsReady = isReady;
+
+  if ("surfaceUpdate" in message) {
+    for (const comp of message.surfaceUpdate.components) {
+      newComponents.set(comp.id, comp);
+    }
+  }
+  if ("dataModelUpdate" in message) {
+    const update = message.dataModelUpdate;
+    newDataModel = { ...dataModel };
+    if (update.path) {
+      const pathParts = update.path.split("/").filter(Boolean);
+      let current: Record<string, unknown> = newDataModel;
+      for (let i = 0; i < pathParts.length - 1; i++) {
+        if (!current[pathParts[i]]) current[pathParts[i]] = {};
+        current = current[pathParts[i]] as Record<string, unknown>;
+      }
+      const lastKey = pathParts[pathParts.length - 1];
+      if (!current[lastKey]) current[lastKey] = {};
+      for (const entry of update.contents) {
+        const value =
+          entry.valueString ??
+          entry.valueNumber ??
+          entry.valueBoolean ??
+          entry.valueArray ??
+          entry.valueMap;
+        (current[lastKey] as Record<string, unknown>)[entry.key] = value;
+      }
+    } else {
+      for (const entry of update.contents) {
+        const value =
+          entry.valueString ??
+          entry.valueNumber ??
+          entry.valueBoolean ??
+          entry.valueArray ??
+          entry.valueMap;
+        newDataModel[entry.key] = value;
+      }
+    }
+  }
+  if ("beginRendering" in message) {
+    newRootId = message.beginRendering.root;
+    newIsReady = true;
+  }
+  return { components: newComponents, dataModel: newDataModel, rootId: newRootId, isReady: newIsReady };
+}
+
+export function useChatStream(options?: UseChatStreamOptions): UseChatStreamResult {
+  const onMarketDataRequestRef = useRef(options?.onMarketDataRequest);
+  onMarketDataRequestRef.current = options?.onMarketDataRequest;
+
   const [state, setState] = useState<ChatStreamState>({
     messages: [],
     a2uiState: {
@@ -53,10 +127,14 @@ export function useChatStream(): UseChatStreamResult {
     error: null,
     currentTool: null,
     streamingContent: "",
+    conversationId: null,
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const historyRef = useRef<ChatHistory[]>([]);
+  const conversationIdRef = useRef<string | null>(null);
+
+  conversationIdRef.current = state.conversationId;
 
   const reset = useCallback(() => {
     if (abortControllerRef.current) {
@@ -64,6 +142,7 @@ export function useChatStream(): UseChatStreamResult {
       abortControllerRef.current = null;
     }
     historyRef.current = [];
+    conversationIdRef.current = null;
     setState({
       messages: [],
       a2uiState: {
@@ -78,6 +157,7 @@ export function useChatStream(): UseChatStreamResult {
       error: null,
       currentTool: null,
       streamingContent: "",
+      conversationId: null,
     });
   }, []);
 
@@ -154,6 +234,93 @@ export function useChatStream(): UseChatStreamResult {
     });
   }, []);
 
+  const loadConversation = useCallback(
+    async (conversationId: string) => {
+      try {
+        const res = await fetch(`${API_URL}/api/conversations/${conversationId}`);
+        if (!res.ok) throw new Error("Failed to load conversation");
+        const conv = await res.json();
+        const msgs = (conv.messages || []) as Array<{
+          id: string;
+          role: string;
+          content: string;
+          a2ui_snapshot?: A2UIMessage[];
+          created_at?: string;
+        }>;
+        const messageList: Message[] = msgs
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({
+            id: m.id || generateId(),
+            role: m.role as "user" | "assistant" | "system",
+            content: m.content || "",
+            timestamp: m.created_at ? new Date(m.created_at) : undefined,
+          }));
+        historyRef.current = msgs.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+        // Apply A2UI from all assistant messages in order; compute final UI state in one go so it restores reliably
+        const a2uiToApply: A2UIMessage[] = [];
+        for (const m of msgs) {
+          if (m.role === "assistant" && m.a2ui_snapshot?.length) {
+            a2uiToApply.push(...m.a2ui_snapshot);
+          }
+        }
+        let a2uiState: StreamState = state.a2uiState;
+        if (a2uiToApply.length) {
+          let components = new Map<string, import("@/lib/types").A2UIComponent>();
+          let dataModel: Record<string, unknown> = {};
+          let rootId: string | null = null;
+          let isReady = false;
+          for (const msg of a2uiToApply) {
+            const next = applyOneA2UIMessage(components, dataModel, rootId, isReady, msg);
+            components = next.components;
+            dataModel = next.dataModel;
+            rootId = next.rootId;
+            isReady = next.isReady;
+          }
+          a2uiState = {
+            components,
+            dataModel,
+            rootId,
+            isReady,
+            isLoading: false,
+            error: null,
+          };
+        } else {
+          a2uiState = {
+            ...state.a2uiState,
+            dataModel: {},
+            rootId: null,
+            isReady: false,
+          };
+        }
+        setState((prev) => ({
+          ...prev,
+          messages: messageList,
+          conversationId,
+          error: null,
+          streamingContent: "",
+          currentTool: null,
+          a2uiState,
+        }));
+      } catch (e) {
+        console.error("Load conversation error:", e);
+        setState((prev) => ({ ...prev, error: (e as Error).message }));
+      }
+    },
+    []
+  );
+
+  const applyA2UIMessages = useCallback(
+    (messages: A2UIMessage[]) => {
+      for (const msg of messages) {
+        processA2UIMessage(msg);
+      }
+    },
+    [processA2UIMessage]
+  );
+
   const sendMessage = useCallback(
     (messageContent: string) => {
       // Add user message
@@ -192,6 +359,7 @@ export function useChatStream(): UseChatStreamResult {
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
+      const conversationIdToSend = conversationIdRef.current ?? undefined;
       // Make streaming request
       fetch(`${API_URL}/api/chat/stream`, {
         method: "POST",
@@ -202,6 +370,8 @@ export function useChatStream(): UseChatStreamResult {
         body: JSON.stringify({
           message: messageContent,
           history: historyRef.current.slice(0, -1), // Exclude current message
+          conversation_id: conversationIdToSend,
+          profile: getProfileForApi() ?? undefined,
         }),
         signal: controller.signal,
       })
@@ -321,12 +491,21 @@ export function useChatStream(): UseChatStreamResult {
                       isLoading: false,
                     }));
                   } else if (currentEvent === "complete") {
-                    // Complete
+                    // Complete; backend may send conversation_id for persistence
+                    const cid = data.conversation_id ?? null;
                     setState((prev) => ({
                       ...prev,
                       isLoading: false,
                       currentTool: null,
+                      ...(cid != null ? { conversationId: cid } : {}),
                     }));
+                  } else if (currentEvent === "market_data_request") {
+                    // Agent requested Market Data tab + load for district/postcode
+                    const payload: MarketDataRequestPayload = {
+                      district: data.district ?? undefined,
+                      postcode: data.postcode ?? undefined,
+                    };
+                    onMarketDataRequestRef.current?.(payload);
                   } else if (currentEvent === "status") {
                     // Status update - can add visual feedback here if needed
                     console.log("Agent status:", data);
@@ -357,5 +536,7 @@ export function useChatStream(): UseChatStreamResult {
     state,
     sendMessage,
     reset,
+    loadConversation,
+    applyA2UIMessages,
   };
 }

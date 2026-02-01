@@ -279,9 +279,6 @@ omg my brain is fried.txt
 test-results/
 playwright-report/
 
-
-
-
 /frontend/.next/
 /frontend/node_modules/
 /frontend/package-lock.json

@@ -298,6 +298,75 @@ def build_what_if_controls(
     ]
 
 
+# ============================================================================
+# Location Comparison (Area Summary) UI
+# ============================================================================
+
+def build_location_comparison_ui(
+    areas: list[dict],
+    winners: dict,
+) -> list[dict]:
+    """
+    Build A2UI message sequence for comparing 2-3 locations using ScanSan area summary.
+
+    DataModel paths:
+    - /comparison/areas: list of normalized area summary objects
+    - /comparison/winners: computed "best" area per metric
+    """
+    messages: list[dict] = []
+    components: list[dict] = []
+
+    # Root layout for comparison tab
+    components.append(build_column_component("comparison_root", [
+        "comparison_summary",
+        "comparison_ranges",
+        "comparison_listings",
+    ]))
+
+    components.append({
+        "id": "comparison_summary",
+        "component": {
+            "LocationComparisonSummaryCard": {
+                "areasPath": _data_path("/comparison/areas"),
+                "winnersPath": _data_path("/comparison/winners"),
+            }
+        }
+    })
+
+    components.append({
+        "id": "comparison_ranges",
+        "component": {
+            "LocationComparisonRanges": {
+                "areasPath": _data_path("/comparison/areas"),
+            }
+        }
+    })
+
+    components.append({
+        "id": "comparison_listings",
+        "component": {
+            "LocationComparisonListings": {
+                "areasPath": _data_path("/comparison/areas"),
+            }
+        }
+    })
+
+    messages.append(build_surface_update(components))
+
+    messages.append(build_data_model_update(
+        [{"key": "areas", "valueArray": areas}],
+        path="/comparison",
+    ))
+    messages.append(build_data_model_update(
+        [{"key": "winners", "valueMap": winners}],
+        path="/comparison",
+    ))
+
+    messages.append(build_begin_rendering("comparison_root"))
+
+    return messages
+
+
 def build_carbon_card(
     location: str,
     current_emissions: float,

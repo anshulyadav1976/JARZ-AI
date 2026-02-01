@@ -126,7 +126,7 @@ class LLMClient:
         messages: list[ChatMessage],
         tools: Optional[list[ToolDefinition]] = None,
         temperature: float = 0.7,
-        max_tokens: int = 16384,
+        max_tokens: int = 200_000,
     ) -> ChatMessage:
         """
         Non-streaming chat completion.

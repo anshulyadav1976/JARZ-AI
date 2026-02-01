@@ -202,6 +202,7 @@ def get_chat_graph():
 async def run_chat_agent(
     user_message: str,
     history: list[ChatMessage] = None,
+    profile: dict | None = None,
 ) -> ChatAgentState:
     """
     Run the chat agent with a user message.
@@ -209,6 +210,7 @@ async def run_chat_agent(
     Args:
         user_message: The user's message
         history: Previous conversation history (optional)
+        profile: Optional user profile (name, role, bio, interests, preferences) for personalisation
         
     Returns:
         Final agent state with response and any A2UI messages
@@ -236,6 +238,8 @@ async def run_chat_agent(
         "status": "thinking",
         "should_continue": True,
     }
+    if profile:
+        initial_state["profile"] = profile
     
     # Run the graph
     final_state = await graph.ainvoke(initial_state)
@@ -246,6 +250,7 @@ async def run_chat_agent(
 async def stream_chat_agent(
     user_message: str,
     history: list[ChatMessage] = None,
+    profile: dict | None = None,
 ) -> AsyncGenerator[dict[str, Any], None]:
     """
     Stream chat agent execution.
@@ -253,6 +258,7 @@ async def stream_chat_agent(
     Args:
         user_message: The user's message
         history: Previous conversation history (optional)
+        profile: Optional user profile (name, role, bio, interests, preferences) for personalisation
         
     Yields:
         Events as the agent processes (text chunks, tool calls, A2UI messages)
@@ -280,6 +286,8 @@ async def stream_chat_agent(
         "status": "thinking",
         "should_continue": True,
     }
+    if profile:
+        initial_state["profile"] = profile
     
     # Stream through the graph (each node's stream_output is that node's output only)
     async for event in graph.astream(initial_state):

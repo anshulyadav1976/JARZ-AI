@@ -3,7 +3,9 @@ Agent tools for the chat-based LangGraph agent.
 
 These tools allow the LLM to interact with the rental valuation system.
 The LLM decides when to call these tools based on user queries.
+Tool results are cached so repeated requests (same args) return fast for demos.
 """
+import re
 from typing import Any, Optional
 from dataclasses import dataclass
 
@@ -11,8 +13,9 @@ from ..schemas import UserQuery, PredictionResult, ExplanationResult, ResolvedLo
 from ..feature_builder import build_features
 from ..model_adapter import get_model_adapter
 from ..explain import explain_prediction
-from ..a2ui_builder import build_complete_ui, build_listings_cards
+from ..a2ui_builder import build_complete_ui, build_listings_cards, build_location_comparison_ui
 from ..scansan_client import get_scansan_client
+from .. import cache as tool_cache
 
 
 @dataclass
@@ -131,10 +134,15 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "compare_areas",
-        "description": "Compare rental forecasts between two different areas. PLACEHOLDER - not yet implemented.",
+        "description": "Compare 2-3 UK areas using ScanSan area summary. Use when the user says 'compare', 'vs', or asks which area is better. Compares total properties, sold price range (last 5y), current valuation range, current rent listings (and rent pcm range if available), and current sale listings (and sale price range if available).",
         "parameters": {
             "type": "object",
             "properties": {
+                "areas": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "List of 2-3 area codes/postcodes to compare (e.g. ['NW1','E14','SW1A']). If provided, this is used instead of location1/location2.",
+                },
                 "location1": {
                     "type": "string",
                     "description": "First location to compare"
@@ -150,7 +158,7 @@ TOOL_DEFINITIONS = [
                     "default": 6
                 }
             },
-            "required": ["location1", "location2"]
+            "required": []
         }
     },
     {
@@ -234,6 +242,20 @@ TOOL_DEFINITIONS = [
                     "description": "Mortgage type: 'interest_only' (default, recommended for BTL) or 'repayment'. Interest-only maximizes cash flow by only paying interest, not principal.",
                     "enum": ["interest_only", "repayment"],
                     "default": "interest_only"
+                }
+            },
+            "required": ["location"]
+        }
+    },
+    {
+        "name": "get_market_data",
+        "description": "Open the Market Data tab and load growth, rent demand, sale demand, valuations, and sale history for a UK location. Use when the user asks for: market data, growth data, rent demand, sale demand, valuations, sale history, or to 'show me market data for X', 'give me market data on postcode Y', 'load market data for NW1', etc. Resolves the location to a district (for growth/demand) and postcode (for valuations/sale history) and instructs the UI to switch to Market Data and load.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The UK location: postcode (e.g. 'NW1 0BH', 'NW1'), district (e.g. 'NW1'), or area name (e.g. 'Camden'). Will be resolved via search to get district; if a full postcode is provided, valuations and sale history will load for that postcode."
                 }
             },
             "required": ["location"]
@@ -376,23 +398,128 @@ async def execute_search_location(query: str) -> LocationSearchResult:
 
 
 async def execute_compare_areas(
-    location1: str,
-    location2: str,
+    location1: str | None = None,
+    location2: str | None = None,
+    areas: Optional[list[str]] = None,
     horizon_months: int = 6,
 ) -> dict:
     """
-    PLACEHOLDER: Compare two areas.
-    
-    This is a placeholder for future implementation.
-    Currently returns a message indicating the feature is not yet available.
+    Compare 2-3 areas based on ScanSan area summary.
     """
+    client = get_scansan_client()
+
+    area_inputs: list[str] = []
+    if areas:
+        area_inputs = [a for a in areas if a]
+    else:
+        if location1:
+            area_inputs.append(location1)
+        if location2:
+            area_inputs.append(location2)
+
+    # Normalize / dedupe
+    normalized_inputs = []
+    for a in area_inputs:
+        a = a.strip()
+        if not a:
+            continue
+        if a.upper() not in [x.upper() for x in normalized_inputs]:
+            normalized_inputs.append(a)
+
+    if len(normalized_inputs) < 2:
+        return {
+            "success": False,
+            "summary": "Please provide at least 2 area codes/postcodes to compare.",
+            "a2ui_messages": [],
+        }
+    if len(normalized_inputs) > 3:
+        normalized_inputs = normalized_inputs[:3]
+
+    # Resolve area codes and fetch summaries
+    areas_out: list[dict] = []
+    for user_input in normalized_inputs:
+        resolved = await client.search_area_codes(user_input)
+        area_code = (resolved.area_code if resolved else user_input).upper()
+        display_name = resolved.display_name if resolved and resolved.display_name else area_code
+
+        raw_summary = await client.get_area_summary(area_code)
+        summary_row = None
+        if isinstance(raw_summary, dict):
+            data = raw_summary.get("data")
+            if isinstance(data, list) and data:
+                summary_row = data[0]
+        if summary_row is None:
+            summary_row = {}
+
+        sold_range = summary_row.get("sold_price_range_in_last_5yrs") or [None, None]
+        valuation_range = summary_row.get("current_valuation_range") or [None, None]
+        rent_pcm_range = summary_row.get("current_rent_listings_pcm_range") or [None, None]
+        sale_price_range = summary_row.get("current_sale_listings_price_range") or [None, None]
+
+        def _mid(rng):
+            try:
+                lo, hi = rng
+                if lo is None or hi is None:
+                    return None
+                return (float(lo) + float(hi)) / 2.0
+            except Exception:
+                return None
+
+        area_obj = {
+            "area_code": area_code,
+            "display_name": display_name,
+            "total_properties": summary_row.get("total_properties"),
+            "total_properties_sold_in_last_5yrs": summary_row.get("total_properties_sold_in_last_5yrs"),
+            "sold_price_min": sold_range[0],
+            "sold_price_max": sold_range[1],
+            "valuation_min": valuation_range[0] if isinstance(valuation_range, list) else None,
+            "valuation_max": valuation_range[1] if isinstance(valuation_range, list) else None,
+            "rent_listings": summary_row.get("current_rent_listings"),
+            "rent_pcm_min": rent_pcm_range[0],
+            "rent_pcm_max": rent_pcm_range[1],
+            "sale_listings": summary_row.get("current_sale_listings"),
+            "sale_price_min": sale_price_range[0],
+            "sale_price_max": sale_price_range[1],
+            # Derived
+            "rent_pcm_mid": _mid(rent_pcm_range),
+            "sale_price_mid": _mid(sale_price_range),
+            "sold_price_mid": _mid(sold_range),
+            "valuation_mid": _mid(valuation_range) if isinstance(valuation_range, list) else None,
+        }
+        areas_out.append(area_obj)
+
+    # Compute winners (simple, practical)
+    def _winner(key: str, mode: str) -> Optional[str]:
+        vals = [(a.get(key), a["area_code"]) for a in areas_out if a.get(key) is not None]
+        if not vals:
+            return None
+        vals.sort(key=lambda x: x[0], reverse=(mode == "max"))
+        return vals[0][1]
+
+    winners = {
+        "cheapest_rent_mid": _winner("rent_pcm_mid", "min"),
+        "most_rent_listings": _winner("rent_listings", "max"),
+        "cheapest_sale_mid": _winner("sale_price_mid", "min"),
+        "most_sale_listings": _winner("sale_listings", "max"),
+        "most_total_properties": _winner("total_properties", "max"),
+    }
+
+    a2ui_messages = build_location_comparison_ui(areas=areas_out, winners=winners)
+
+    # Natural summary for the LLM / UI
+    summary = (
+        f"Compared {', '.join([a['area_code'] for a in areas_out])}. "
+        f"Cheapest rent (midpoint) looks like {winners.get('cheapest_rent_mid') or 'N/A'}, "
+        f"and the most rent listings is {winners.get('most_rent_listings') or 'N/A'}. "
+        f"Cheapest sale (midpoint) looks like {winners.get('cheapest_sale_mid') or 'N/A'}."
+    )
+
     return {
-        "status": "not_implemented",
-        "message": (
-            f"Area comparison between '{location1}' and '{location2}' is not yet implemented. "
-            "This feature will be available in a future update. "
-            "For now, you can run separate forecasts for each location."
-        )
+        "success": True,
+        "areas": areas_out,
+        "winners": winners,
+        "a2ui_messages": a2ui_messages,
+        "summary": summary,
     }
 
 
@@ -984,9 +1111,52 @@ async def execute_get_property_listings(
         )
 
 
+async def execute_get_market_data(location: str) -> dict[str, Any]:
+    """
+    Resolve location and return a market_data_request payload so the frontend
+    switches to the Market Data tab and loads growth, demand, valuations, sale history.
+    """
+    client = get_scansan_client()
+    resolved = await client.search_area_codes(location.strip())
+    district = None
+    postcode = None
+    if resolved:
+        district = (resolved.area_code_district or resolved.area_code or "").strip().upper()
+    # Normalize user input for postcode check
+    raw = (location or "").strip().upper().replace(" ", "")
+    # UK full postcode: outward (e.g. NW1) + inward (e.g. 0BH = digit + 2 letters)
+    if re.match(r"^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$", raw):
+        postcode = raw
+    elif " " in location or len(raw) > 4:
+        # User may have typed "NW1 0BH" or "NW10BH"
+        postcode = raw if len(raw) >= 5 else None
+    if not district and not postcode:
+        # Fallback: use first part of location as district (e.g. "NW1" from "NW1 something")
+        first_part = (location or "").strip().upper().split()[0] or location
+        if re.match(r"^[A-Z]{1,2}\d[A-Z\d]?$", first_part.replace(" ", "")):
+            district = first_part.replace(" ", "")
+    if not district:
+        district = postcode[:4] if postcode and len(postcode) >= 4 else (location or "").strip().upper()[:4]
+    summary = f"Opening Market Data for {district}" + (f" (postcode {postcode})" if postcode else "") + ". The Market Data tab will load growth, rent and sale demand, and—if a full postcode was given—valuations and sale history."
+    return {
+        "success": True,
+        "summary": summary,
+        "market_data_request": {
+            "district": district or None,
+            "postcode": postcode or None,
+        },
+    }
+
+
+def _cache_key(tool_name: str, arguments: dict[str, Any]) -> str:
+    """Build a stable cache key for tool + args."""
+    return tool_cache._make_key("tool", tool_name, arguments)
+
+
 async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Execute a tool by name with given arguments.
+    Results are cached so repeated calls with same args return fast (for demos).
     
     Args:
         tool_name: Name of the tool to execute
@@ -995,13 +1165,18 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
     Returns:
         Tool execution result as a dict
     """
+    cache_key = _cache_key(tool_name, arguments)
+    cached = tool_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     if tool_name == "get_rent_forecast":
         result = await execute_get_rent_forecast(
             location=arguments["location"],
             horizon_months=arguments.get("horizon_months", 6),
             k_neighbors=arguments.get("k_neighbors", 5),
         )
-        return {
+        out = {
             "success": True,
             "prediction": result.prediction,
             "explanation": result.explanation,
@@ -1010,31 +1185,37 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             "a2ui_messages": result.a2ui_messages,
             "summary": result.summary,
         }
-    
+        tool_cache.set_(cache_key, out)
+        return out
+
     elif tool_name == "search_location":
         result = await execute_search_location(
             query=arguments["query"]
         )
-        return {
+        out = {
             "success": result.found,
             "location": result.location,
             "message": result.message,
         }
-    
+        tool_cache.set_(cache_key, out)
+        return out
+
     elif tool_name == "compare_areas":
         result = await execute_compare_areas(
-            location1=arguments["location1"],
-            location2=arguments["location2"],
+            location1=arguments.get("location1"),
+            location2=arguments.get("location2"),
+            areas=arguments.get("areas"),
             horizon_months=arguments.get("horizon_months", 6),
         )
+        tool_cache.set_(cache_key, result)
         return result
-    
+
     elif tool_name == "get_embodied_carbon":
         result = await execute_get_embodied_carbon(
             location=arguments["location"],
             property_type=arguments.get("property_type", "flat"),
         )
-        return {
+        out = {
             "success": result.success,
             "location": result.location,
             "current_emissions": result.current_emissions,
@@ -1047,14 +1228,16 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             "a2ui_messages": result.a2ui_messages,
             "summary": result.summary,
         }
-    
+        tool_cache.set_(cache_key, out)
+        return out
+
     elif tool_name == "get_property_listings":
         result = await execute_get_property_listings(
             location=arguments["location"],
             listing_types=arguments.get("listing_types", ["rent", "sale"]),
             include_amenities=arguments.get("include_amenities", True),
         )
-        return {
+        out = {
             "success": result.success,
             "location": result.location,
             "area_code": result.area_code,
@@ -1064,7 +1247,9 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             "a2ui_messages": result.a2ui_messages,
             "summary": result.summary,
         }
-    
+        tool_cache.set_(cache_key, out)
+        return out
+
     elif tool_name == "get_investment_analysis":
         from .investment import execute_get_investment_analysis
         result = await execute_get_investment_analysis(
@@ -1075,7 +1260,7 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             mortgage_years=arguments.get("mortgage_years", 25),
             mortgage_type=arguments.get("mortgage_type", "interest_only"),
         )
-        return {
+        out = {
             "success": result.success,
             "location": result.location,
             "property_value": result.property_value,
@@ -1093,6 +1278,13 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             "a2ui_messages": result.a2ui_messages,
             "summary": result.summary,
         }
+        tool_cache.set_(cache_key, out)
+        return out
+
+    elif tool_name == "get_market_data":
+        out = await execute_get_market_data(location=arguments["location"])
+        tool_cache.set_(cache_key, out)
+        return out
     
     else:
         return {

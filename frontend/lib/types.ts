@@ -144,6 +144,52 @@ export interface WhatIfControlsProps {
   compareMode: boolean;
 }
 
+// ============================================================================
+// Location Comparison (Area Summary)
+// ============================================================================
+
+export interface AreaSummaryComparisonRow {
+  area_code: string;
+  display_name: string;
+  total_properties?: number | null;
+  total_properties_sold_in_last_5yrs?: number | null;
+  sold_price_min?: number | null;
+  sold_price_max?: number | null;
+  valuation_min?: number | null;
+  valuation_max?: number | null;
+  rent_listings?: number | null;
+  rent_pcm_min?: number | null;
+  rent_pcm_max?: number | null;
+  sale_listings?: number | null;
+  sale_price_min?: number | null;
+  sale_price_max?: number | null;
+  rent_pcm_mid?: number | null;
+  sale_price_mid?: number | null;
+  sold_price_mid?: number | null;
+  valuation_mid?: number | null;
+}
+
+export interface LocationComparisonWinners {
+  cheapest_rent_mid?: string | null;
+  most_rent_listings?: string | null;
+  cheapest_sale_mid?: string | null;
+  most_sale_listings?: string | null;
+  most_total_properties?: string | null;
+}
+
+export interface LocationComparisonSummaryCardProps {
+  areas: AreaSummaryComparisonRow[];
+  winners: LocationComparisonWinners;
+}
+
+export interface LocationComparisonRangesProps {
+  areas: AreaSummaryComparisonRow[];
+}
+
+export interface LocationComparisonListingsProps {
+  areas: AreaSummaryComparisonRow[];
+}
+
 // Stream state
 export interface StreamState {
   components: Map<string, A2UIComponent>;
@@ -152,4 +198,77 @@ export interface StreamState {
   isReady: boolean;
   isLoading: boolean;
   error: string | null;
+}
+
+// ============================================================================
+// Market Data (Growth, Demand, Valuations, Sale History)
+// ============================================================================
+
+export interface GrowthDataPoint {
+  area_code_district?: string;
+  year_month: string;
+  avg_price: number;
+  percentage_change: number;
+}
+
+export interface GrowthData {
+  monthly_data?: GrowthDataPoint[];
+  yearly_data?: GrowthDataPoint[];
+}
+
+export interface RentDemandItem {
+  total_properties_for_rent?: number;
+  mean_rent_pcm?: number;
+  median_rent_pcm?: number;
+  currency?: string;
+  average_transactions_pcm?: number;
+  months_of_inventory?: number;
+  turnover_percentage_pcm?: number;
+  days_on_market?: number;
+  market_rating?: string;
+}
+
+export interface SaleDemandItem {
+  total_properties_for_sale?: number;
+  mean_price?: number;
+  median_price?: number;
+  currency?: string;
+  average_transactions_pcm?: number;
+  months_of_inventory?: number;
+  days_on_market?: number;
+  market_rating?: string;
+}
+
+export interface ValuationRecord {
+  property_address: string;
+  last_sold_price?: number | null;
+  last_sold_date?: string | null;
+  bounded_valuation?: [number, number];
+  lower_outlier?: boolean;
+  upper_outlier?: boolean;
+}
+
+export interface HistoricalValuationPoint {
+  date: string;
+  valuation: number;
+}
+
+export interface HistoricalValuationRecord {
+  property_address: string;
+  valuations: HistoricalValuationPoint[];
+}
+
+export interface SaleHistoryTransaction {
+  sold_date?: string;
+  sold_price?: number;
+  property_tenure?: string;
+  price_diff_amount?: number | null;
+  price_diff_percentage?: number | null;
+}
+
+export interface SaleHistoryRecord {
+  property_address: string;
+  uprn?: number | null;
+  property_type?: string;
+  transactions: SaleHistoryTransaction[];
 }

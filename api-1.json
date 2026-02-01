@@ -1,0 +1,2832 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ScanSan - Go Area Codes API",
+    "description": "API for fetching data for a relevant area\n\nResources:\n- [Postcode Formatting](https://en.wikipedia.org/wiki/Postcodes_in_the_United_Kingdom#Structure,_Formatting_and_Validation)\n\n> [!note]\n> Most endpoints do not check for the existence of a postcode or district,\nbut just checks the format. To check if the place exists use the area_codes search endpoint\n",
+    "contact": {
+      "email": "samson@scansanproperties.com"
+    },
+    "version": "v0.0.129"
+  },
+  "security": [
+    {
+      "ApiKeyAuth": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "https://api.scansan.com"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Area Code",
+      "description": "{area_codes} is either 1 postcode or 1 postcode district\n"
+    },
+    {
+      "name": "Postal Code",
+      "description": "{area_code_postal} is 1 postcode\n"
+    },
+    {
+      "name": "District",
+      "description": "{area_code_district} is 1 postcode district\n"
+    },
+    {
+      "name": "Property",
+      "description": "{uprn} is 1 [UPRN](https://en.wikipedia.org/wiki/Unique_Property_Reference_Number)\n"
+    }
+  ],
+  "paths": {
+    "/v1/area_codes/search": {
+      "get": {
+        "tags": [
+          "Area Code"
+        ],
+        "summary": "Search",
+        "description": "Get a list of areacodes/postcodes, localities/boroughs, wards and\nstreets for a given area, where each array element is grouped by the\npostcode district.\n\nValid inputs:\n- full postcodes\n- postcode district\n- street names\n- place names\n\nThe highest granularity is the street name, not the postcode.\n\nValid Parameters:\n(area_name) OR (gbr_district AND gbr_street)\n",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "area_name",
+            "in": "query",
+            "description": "term to search for",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gbr_district",
+            "in": "query",
+            "description": "A GBR postcode district",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "gbr_street",
+            "in": "query",
+            "description": "A GBR street within the specified postcode district",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Eeither `area_name` or `gbr_district`+`gbr_street` are required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponseError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Search term is not an area or does not exist in the database",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponseError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/area_codes/{area_code}/summary": {
+      "get": {
+        "tags": [
+          "Area Code"
+        ],
+        "summary": "Summary",
+        "description": "Summary returns the following counts and prices ranges:\n  - Total properties\n  - Sold price range in the past 5 years\n  - Current valuation range\n  - Current rent listings\n  - Current sale listings\n\n  For the given {area_code}\n",
+        "operationId": "summary",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SummaryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Given {area_code} does not exist in the database.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/area_codes/{area_code}/rent/listings": {
+      "get": {
+        "tags": [
+          "Area Code"
+        ],
+        "summary": "Rent Listings",
+        "description": "Get Rent Listings for the given *area_code*.\n\n> [!note]\n> Listings for a postcode rely on addreses matching, and will typically\nresult in few or no results\n",
+        "operationId": "rentlistings",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentListingsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Given {area_code} does not have any associated rent listing data, or {area_code} does not exist in the database.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/area_codes/{area_code}/sale/listings": {
+      "get": {
+        "tags": [
+          "Area Code"
+        ],
+        "summary": "Sale Listings",
+        "description": "Get Sale Listings for the given *area_code*.\n\n> [!note]\n> Listings for a postcode rely on addreses matching, and will typically\nresult in few or no results\n",
+        "operationId": "salelistings",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleListingsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Given {area_code} does not have any associated sale listing data, or {area_code} does not exist in the database.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/area_codes/{area_code}/crime/summary": {
+      "get": {
+        "tags": [
+          "Area Code"
+        ],
+        "summary": "Crime Summary",
+        "description": "Crime Summary for given *area_code*",
+        "operationId": "crimesummary",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrimeSummaryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Schema contains an error \"code\" and \"message\" which describes the issue.   *code* is constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/area_codes/{area_code}/crime/detail": {
+      "get": {
+        "tags": [
+          "Area Code"
+        ],
+        "summary": "Crime Detail",
+        "description": "Crime Summary for given *area_code*",
+        "operationId": "crimedetail",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrimeDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/district/{area_code_district}/growth": {
+      "get": {
+        "tags": [
+          "District"
+        ],
+        "summary": "Growth",
+        "description": "Gets month-on-month growth for the current year and year-on-year growth for previous years",
+        "operationId": "growth",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_district"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GrowthResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/district/{area_code_district}/rent/demand": {
+      "get": {
+        "tags": [
+          "District"
+        ],
+        "summary": "Rental Demand",
+        "description": "Get rental demand data for a given *area_code_district*.\n",
+        "operationId": "rentdemand",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_district"
+          },
+          {
+            "name": "additional_data",
+            "in": "query",
+            "description": "Include additional data *(default: false)*\n",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "YYYY-MM"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RentDemandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid area_code_district",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/district/{area_code_district}/sale/demand": {
+      "get": {
+        "tags": [
+          "District"
+        ],
+        "summary": "Sales Demand",
+        "description": "Sales demand data for given *area_code_district*\n",
+        "operationId": "saledemand",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_district"
+          },
+          {
+            "name": "additional_data",
+            "in": "query",
+            "description": "Include additional data *(default: false)*\n",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "YYYY-MM"
+            },
+            "examples": "2024-11"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleDemandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid area_code_district",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/postcode/{area_code_postal}/sale/history": {
+      "get": {
+        "tags": [
+          "Postal Code"
+        ],
+        "summary": "Sale History",
+        "description": "Gets sale history for properties on the  given UK postcode",
+        "operationId": "salehistory",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_postal"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleHistoryResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/postcode/{area_code_postal}/classification": {
+      "get": {
+        "tags": [
+          "Postal Code"
+        ],
+        "summary": "Classification",
+        "description": "Gets classification data for a given UK postcode",
+        "operationId": "classification",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_postal"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassificationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/postcode/{area_code_postal}/addresses": {
+      "get": {
+        "tags": [
+          "Postal Code"
+        ],
+        "summary": "Addresses",
+        "description": "Gets addresses for given postcode",
+        "operationId": "addresses",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_postal"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid *area_code_postal*  format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/postcode/{area_code_postal}/regeneration": {
+      "get": {
+        "tags": [
+          "Postal Code"
+        ],
+        "summary": "Regeneration",
+        "description": "Gets regeneration data for given postcode",
+        "operationId": "regeneration",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_postal"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegenerationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid *area_code_postal*  format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/postcode/{area_code_postal}/valuations/current": {
+      "get": {
+        "tags": [
+          "Postal Code"
+        ],
+        "summary": "Current Valuations",
+        "description": "Gets valuations for each address in a given postcode",
+        "operationId": "currentvaluation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_postal"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValuationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid *area_code_postal*  format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/postcode/{area_code_postal}/valuations/historical": {
+      "get": {
+        "tags": [
+          "Postal Code"
+        ],
+        "summary": "Historical Valuations",
+        "description": "Gets historical valuations for each address in a given postcode",
+        "operationId": "historicalvaluation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_postal"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoricalValuationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid *area_code_postal*  format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/postcode/{area_code_postal}/energy/performance": {
+      "get": {
+        "tags": [
+          "Postal Code"
+        ],
+        "summary": "Energy Performance",
+        "description": "Gets most up-to-date energy performance data for properties for a given *area_code_postal*.   If a property has an expired certificate and has not been renewed, the expired certificate data will be shown.   If a new *active* certificate has been registered for a property, only that certificate data will be shown.   If there are no certificates for a property, there will be no data element for that property/address.\n",
+        "operationId": "energyperf",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_postal"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnergyPerformanceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid *area_code_postal*  format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/postcode/{area_code_postal}/census": {
+      "get": {
+        "tags": [
+          "Postal Code"
+        ],
+        "summary": "Census",
+        "description": "Fetches the following census related data for the given *area_code_postal*:\n  - Demographics\n  - Housing\n  - Indicators\n",
+        "operationId": "census",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_postal"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CensusResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid *area_code_postal*  format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/postcode/{area_code_postal}/amenities": {
+      "get": {
+        "tags": [
+          "Postal Code"
+        ],
+        "summary": "Amenities",
+        "description": "Fetches the nearest amenities for the given *area_code_postal*: - Railway Station - Tube DLR Station - Primary School - Secondary School - General Practitioner - Dentist - Hospital - Opticians\n",
+        "operationId": "amenities",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_postal"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AmenitiesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid *area_code_postal*  format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/postcode/{area_code_postal}/lha": {
+      "get": {
+        "tags": [
+          "Postal Code"
+        ],
+        "summary": "Local Housing Allowance (LHA)",
+        "description": "Fetches LHA data for the given *area_code_postal*:\n",
+        "operationId": "lha",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/area_code_postal"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LHAResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid *area_code_postal*  format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/property/{uprn}/planning_permission": {
+      "get": {
+        "tags": [
+          "Property"
+        ],
+        "summary": "Planning Permission",
+        "description": "Fetches planning permission data for the given *uprn*:\n",
+        "operationId": "planningpermission",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/uprn"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningPermissionResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/property/{uprn}/addresses": {
+      "get": {
+        "tags": [
+          "Property"
+        ],
+        "summary": "Addresses",
+        "description": "Fetches addresses for the given *uprn*:\n",
+        "operationId": "propaddresses",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/uprn"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AddressesResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/property/{uprn}/energy/performance": {
+      "get": {
+        "tags": [
+          "Property"
+        ],
+        "summary": "Energy Performance",
+        "description": "Gets most up-to-date energy performance data for properties for a given *uprn*.   If a property has an expired certificate and has not been renewed, the expired certificate data will be shown.   If a new *active* certificate has been registered for a property, only that certificate data will be shown.   If there are no certificates for a property, there will be no data element for that property/address.\n",
+        "operationId": "propenergyperf",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/uprn"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnergyPerformanceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid *area_code_postal*  format",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Contains an error \"code\" and \"message\" which describes the issue.   *code* is a constant, *message* gives more details.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Auth-Token",
+        "description": "API key obtained from the ScanSan sign up site"
+      }
+    },
+    "parameters": {
+      "area_code": {
+        "name": "area_code",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "area_code | area_code_district",
+          "examples": [
+            "NW1 0BH",
+            "NW1"
+          ]
+        }
+      },
+      "area_code_district": {
+        "name": "area_code_district",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "area_code_district",
+          "examples": [
+            "NW1"
+          ]
+        }
+      },
+      "area_code_postal": {
+        "name": "area_code_postal",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "area_code",
+          "examples": [
+            "NW1 0BH",
+            "SM4 5BQ",
+            "SE255NF"
+          ]
+        }
+      },
+      "report_format": {
+        "name": "format",
+        "in": "query",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "html",
+            "html.sections",
+            "pdf"
+          ],
+          "default": "html"
+        }
+      },
+      "uprn": {
+        "name": "uprn",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "format": "UPRN",
+          "examples": [
+            34019560,
+            48105299,
+            100020660116,
+            5024087
+          ]
+        }
+      }
+    },
+    "schemas": {
+      "StandardResponse": {
+        "type": "object",
+        "properties": {
+          "area_code": {
+            "type": "string",
+            "examples": "W12"
+          },
+          "area_code_type": {
+            "type": "string",
+            "examples": "area_code_district"
+          },
+          "response_time": {
+            "type": "string",
+            "examples": 0.56
+          }
+        }
+      },
+      "StandardError": {
+        "type": "object",
+        "properties": {
+          "area_code": {
+            "type": "string",
+            "examples": "SE255NF"
+          },
+          "data": {
+            "type": "object",
+            "nullable": true
+          },
+          "code": {
+            "type": "string",
+            "examples": "NOT_FOUND"
+          },
+          "message": {
+            "type": "string",
+            "examples": "Resource not found"
+          },
+          "trace_id": {
+            "type": "string",
+            "examples": "2025011012-ERRITE-ANGEVIN"
+          }
+        }
+      },
+      "SearchResponseError": {
+        "type": "object",
+        "properties": {
+          "search_query": {
+            "type": "string",
+            "examples": "SE2555NF"
+          },
+          "data": {
+            "type": "object",
+            "examples": null
+          },
+          "code": {
+            "type": "string",
+            "examples": "NOT_FOUND"
+          },
+          "message": {
+            "type": "string",
+            "examples": "Resource not found"
+          },
+          "trace_id": {
+            "type": "string",
+            "examples": "2025010618-SIMLING-ARIL"
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "properties": {
+          "search_query": {
+            "type": "string",
+            "format": "postcode | district | place name",
+            "examples": [
+              "Brixton"
+            ]
+          },
+          "search_found": {
+            "type": "string",
+            "format": "area_code | area_code_district | borough | ward | street",
+            "examples": [
+              "ward"
+            ]
+          },
+          "response_time": {
+            "type": "string",
+            "format": "float (in seconds)",
+            "examples": [
+              "2.05"
+            ]
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "area_code": {
+                    "type": "object",
+                    "properties": {
+                      "area_code_district": {
+                        "type": "string",
+                        "examples": "SW2"
+                      },
+                      "area_code_count": {
+                        "type": "integer",
+                        "examples": 460
+                      },
+                      "area_code_list": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "examples": "SW21AA"
+                        }
+                      }
+                    }
+                  },
+                  "borough": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "examples": "Lambeth"
+                    }
+                  },
+                  "ward": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "examples": "Brixton Acre Lane"
+                    }
+                  },
+                  "street": {
+                    "type": "object",
+                    "properties": {
+                      "street_count": {
+                        "type": "integer",
+                        "examples": 160
+                      },
+                      "street_list": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "examples": "A204"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "RentListingsResponse": {
+        "type": "object",
+        "properties": {
+          "area_code": {
+            "type": "string",
+            "examples": "W12"
+          },
+          "area_code_type": {
+            "type": "string",
+            "examples": "area_code_district"
+          },
+          "response_time": {
+            "type": "string",
+            "examples": 0.56
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "rent_listings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "area_code_district": {
+                      "type": "string",
+                      "examples": "W12"
+                    },
+                    "street_address": {
+                      "type": "string",
+                      "examples": "Central Gardens White City Living"
+                    },
+                    "rent_pcm": {
+                      "type": "integer",
+                      "examples": 3683
+                    },
+                    "rent_pw": {
+                      "type": "integer",
+                      "examples": 850
+                    },
+                    "bedrooms": {
+                      "type": "integer",
+                      "format": "nullable",
+                      "examples": 2
+                    },
+                    "bathrooms": {
+                      "type": "integer",
+                      "format": "nullable",
+                      "examples": 2
+                    },
+                    "living_rooms": {
+                      "type": "integer",
+                      "format": "nullable",
+                      "examples": 1
+                    },
+                    "property_size": {
+                      "type": "string",
+                      "format": "nullable"
+                    },
+                    "property_size_metric": {
+                      "type": "string",
+                      "format": "nullable"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "examples": "GBP"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "SaleListingsResponse": {
+        "type": "object",
+        "properties": {
+          "area_code": {
+            "type": "string",
+            "examples": "SE255NF"
+          },
+          "area_code_type": {
+            "type": "string",
+            "examples": "area_code"
+          },
+          "response_time": {
+            "type": "string",
+            "examples": 0.23
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "sale_listings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "area_code_district": {
+                      "type": "string",
+                      "examples": "SE25"
+                    },
+                    "street_address": {
+                      "type": "string",
+                      "examples": "Tennison Road"
+                    },
+                    "sale_price": {
+                      "type": "integer",
+                      "examples": 280000
+                    },
+                    "bedrooms": {
+                      "type": "integer",
+                      "format": "nullable",
+                      "examples": 1
+                    },
+                    "bathrooms": {
+                      "type": "integer",
+                      "format": "nullable",
+                      "examples": 1
+                    },
+                    "living_rooms": {
+                      "type": "integer",
+                      "format": "nullable",
+                      "examples": 1
+                    },
+                    "property_size": {
+                      "type": "string",
+                      "format": "nullable"
+                    },
+                    "property_size_metric": {
+                      "type": "string",
+                      "format": "nullable"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "examples": "GBP"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "SummaryResponse": {
+        "type": "object",
+        "properties": {
+          "area_code": {
+            "type": "string",
+            "examples": "W12"
+          },
+          "area_code_type": {
+            "type": "string",
+            "examples": "area_code_district"
+          },
+          "response_time": {
+            "type": "string",
+            "examples": 10.62
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "total_properties": {
+                  "type": "integer",
+                  "examples": 18192
+                },
+                "total_properties_sold_in_last_5yrs": {
+                  "type": "integer",
+                  "examples": 2251
+                },
+                "sold_price_range_in_last_5yrs": {
+                  "type": "array",
+                  "nullable": true,
+                  "items": {
+                    "type": "number",
+                    "format": "double"
+                  }
+                },
+                "current_valuation_range": {
+                  "type": "array",
+                  "nullable": true,
+                  "items": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "minItems": 0,
+                  "maxItems": 2
+                },
+                "current_rent_listings": {
+                  "type": "integer",
+                  "examples": 166
+                },
+                "current_rent_listings_pcm_range": {
+                  "type": "array",
+                  "nullable": true,
+                  "items": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "minItems": 0,
+                  "maxItems": 2
+                },
+                "current_sale_listings": {
+                  "type": "integer",
+                  "examples": 211
+                },
+                "current_sale_listings_price_range": {
+                  "type": "array",
+                  "nullable": true,
+                  "items": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "minItems": 0,
+                  "maxItems": 2
+                }
+              }
+            }
+          }
+        }
+      },
+      "CrimeSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "Jan 2006",
+              "examples": "Nov 2024"
+            }
+          },
+          "total_incidents": {
+            "type": "integer",
+            "examples": 359
+          },
+          "category_counts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "category": {
+                  "type": "string",
+                  "examples": "bicycle-theft"
+                },
+                "count": {
+                  "type": "integer",
+                  "examples": 3
+                }
+              }
+            }
+          },
+          "location_counts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "location": {
+                  "type": "string",
+                  "examples": "On or near Gale Close"
+                },
+                "count": {
+                  "type": "integer",
+                  "examples": 3
+                }
+              }
+            }
+          },
+          "outcome_status_counts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "outcome_status": {
+                  "type": "string",
+                  "examples": "Investigation complete; no suspect identified"
+                },
+                "count": {
+                  "type": "integer",
+                  "examples": 109
+                }
+              }
+            }
+          }
+        }
+      },
+      "CrimeDetailResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "crime_category": {
+                      "type": "string",
+                      "examples": "anti-social-behaviour"
+                    },
+                    "street_name": {
+                      "type": "string",
+                      "examples": "On or near Rowland Way"
+                    },
+                    "latitude": {
+                      "type": "number",
+                      "examples": 51.414537
+                    },
+                    "longitude": {
+                      "type": "number",
+                      "examples": -0.191647
+                    },
+                    "date": {
+                      "type": "string",
+                      "examples": "Nov 2024"
+                    },
+                    "outcome_status": {
+                      "type": "string",
+                      "examples": "Unknown",
+                      "nullable": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RentDemandResponse": {
+        "type": "object",
+        "properties": {
+          "area_code": {
+            "type": "string",
+            "examples": "W12"
+          },
+          "area_code_type": {
+            "type": "string",
+            "examples": "area_code_district"
+          },
+          "distance_match": {
+            "type": "string",
+            "examples": 0
+          },
+          "target_month": {
+            "type": "string",
+            "examples": "Dec"
+          },
+          "target_year": {
+            "type": "integer",
+            "examples": 2024
+          },
+          "response_time": {
+            "type": "string",
+            "examples": 10.62
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "rental_demand": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "total_properties_for_rent": {
+                      "type": "integer"
+                    },
+                    "mean_rent_pcm": {
+                      "type": "integer"
+                    },
+                    "median_rent_pcm": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "examples": "GBP"
+                    },
+                    "average_transactions_pcm": {
+                      "type": "integer"
+                    },
+                    "months_of_inventory": {
+                      "type": "number"
+                    },
+                    "turnover_percentage_pcm": {
+                      "type": "integer"
+                    },
+                    "days_on_market": {
+                      "type": "integer"
+                    },
+                    "market_rating": {
+                      "type": "string",
+                      "examples": "Balanced"
+                    }
+                  }
+                }
+              },
+              "additional_rental_data": {
+                "type": "object",
+                "properties": {
+                  "price_category": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "min_price": {
+                          "type": "integer"
+                        },
+                        "max_price": {
+                          "type": "integer"
+                        },
+                        "period": {
+                          "type": "string",
+                          "examples": "PCM"
+                        },
+                        "properties_for_rent": {
+                          "type": "integer"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "examples": "GBP"
+                        }
+                      }
+                    }
+                  },
+                  "bedrooms_category": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "no_of_bedrooms": {
+                          "type": "integer"
+                        },
+                        "properties_for_rent": {
+                          "type": "integer"
+                        },
+                        "mean_rent_pcm": {
+                          "type": "integer"
+                        },
+                        "median_rent_pcm": {
+                          "type": "integer"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "examples": "GBP"
+                        }
+                      }
+                    }
+                  },
+                  "type_category": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "property_type": {
+                          "type": "string",
+                          "examples": "Room"
+                        },
+                        "properties_for_rent": {
+                          "type": "integer"
+                        },
+                        "mean_rent_pcm": {
+                          "type": "integer"
+                        },
+                        "median_rent_pcm": {
+                          "type": "integer"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "examples": "GBP"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "SaleDemandResponse": {
+        "type": "object",
+        "properties": {
+          "area_code": {
+            "type": "string",
+            "examples": "W12"
+          },
+          "area_code_type": {
+            "type": "string",
+            "examples": "area_code_district"
+          },
+          "target_month": {
+            "type": "string",
+            "examples": "Dec"
+          },
+          "target_year": {
+            "type": "integer",
+            "examples": 2024
+          },
+          "response_time": {
+            "type": "string",
+            "examples": 10.62
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "sale_demand": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "total_properties_for_sale": {
+                      "type": "integer"
+                    },
+                    "mean_price": {
+                      "type": "integer"
+                    },
+                    "median_price": {
+                      "type": "integer"
+                    },
+                    "currency": {
+                      "type": "string",
+                      "examples": "GBP"
+                    },
+                    "average_transactions_pcm": {
+                      "type": "integer"
+                    },
+                    "months_of_inventory": {
+                      "type": "number"
+                    },
+                    "turnover_percentage_pcm": {
+                      "type": "integer"
+                    },
+                    "mean_otm_days": {
+                      "type": "integer"
+                    },
+                    "market_rating": {
+                      "type": "string",
+                      "examples": "Buyer's"
+                    }
+                  }
+                }
+              },
+              "additional_sale_data": {
+                "type": "object",
+                "properties": {
+                  "price_category": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "min_price": {
+                          "type": "integer"
+                        },
+                        "max_price": {
+                          "type": "integer"
+                        },
+                        "properties_for_sale": {
+                          "type": "integer"
+                        },
+                        "mean_otm_days": {
+                          "type": "integer"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "examples": "GBP"
+                        }
+                      }
+                    }
+                  },
+                  "bedrooms_category": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "no_of_bedrooms": {
+                          "type": "integer"
+                        },
+                        "properties_for_sale": {
+                          "type": "integer"
+                        },
+                        "mean_otm_days": {
+                          "type": "integer"
+                        },
+                        "median_price": {
+                          "type": "integer"
+                        },
+                        "mean_price": {
+                          "type": "integer"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "examples": "GBP"
+                        }
+                      }
+                    }
+                  },
+                  "type_category": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "property_type": {
+                          "type": "string",
+                          "examples": "Room"
+                        },
+                        "properties_for_sale": {
+                          "type": "integer"
+                        },
+                        "mean_otm_days": {
+                          "type": "integer"
+                        },
+                        "median_price": {
+                          "type": "integer"
+                        },
+                        "mean_price": {
+                          "type": "integer"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "examples": "GBP"
+                        }
+                      }
+                    }
+                  },
+                  "otm_category": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "min_otm_months": {
+                          "type": "integer"
+                        },
+                        "max_otm_months": {
+                          "type": "integer"
+                        },
+                        "properties_for_sale": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ClassificationResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "classification": {
+                      "type": "string",
+                      "examples": "A1"
+                    },
+                    "class_description": {
+                      "type": "string",
+                      "examples": "Urban Major Conurbation"
+                    },
+                    "class_definition": {
+                      "type": "string",
+                      "examples": "Output Area falls within a built-up area with a population of 10,000 or more and is assigned to the major conurbation settlement category. The wider surrounding area is less sparsely populated\n"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "AddressesResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "uprn": {
+                      "type": "integer",
+                      "examples": 100020660110
+                    },
+                    "property_address": {
+                      "type": "string",
+                      "examples": "165, TENNISON ROAD, LONDON, SE25 5NF"
+                    },
+                    "area_code": {
+                      "type": "string",
+                      "examples": "SE255NF"
+                    },
+                    "property_type": {
+                      "type": "string",
+                      "examples": "terraced"
+                    },
+                    "property_tenure": {
+                      "type": "string",
+                      "nullable": true,
+                      "examples": "freehold"
+                    },
+                    "coords": {
+                      "type": "object",
+                      "properties": {
+                        "latitude": {
+                          "type": "number",
+                          "examples": 51.3931
+                        },
+                        "longitude": {
+                          "type": "number",
+                          "examples": -0.073794
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "RegenerationResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "locality": {
+                      "type": "string",
+                      "examples": "Enfield"
+                    },
+                    "target_area": {
+                      "type": "string",
+                      "examples": "Northumberland Park"
+                    },
+                    "regeneration_description": {
+                      "type": "string",
+                      "examples": "The Northumberland Park Regeneration project is a significant initiative aimed at enhancing the quality of life in the Northumberland Park area. By constructing new homes, improving public spaces, and upgrading local amenities, the project seeks to address the housing needs and infrastructure deficiencies in the community. As part of the broader North Tottenham regeneration scheme, this project contributes to the overall revitalization of the region.\n"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ValuationResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "property_address": {
+                      "type": "string",
+                      "examples": "41, RHODRONS AVENUE, CHESSINGTON, KT9 1AY"
+                    },
+                    "last_sold_price": {
+                      "type": "number",
+                      "examples": 249999,
+                      "nullable": true
+                    },
+                    "last_sold_date": {
+                      "type": "string",
+                      "examples": "02 Jun 2006",
+                      "nullable": true
+                    },
+                    "lower_outlier": {
+                      "type": "boolean",
+                      "examples": false,
+                      "nullable": true
+                    },
+                    "upper_outlier": {
+                      "type": "boolean",
+                      "examples": false,
+                      "nullable": true
+                    },
+                    "bounded_valuation": {
+                      "type": "array",
+                      "maxItems": 2,
+                      "minItems": 2,
+                      "items": {
+                        "type": "number",
+                        "format": "double"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "HistoricalValuationResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "property_address": {
+                      "type": "string",
+                      "examples": "41, RHODRONS AVENUE, CHESSINGTON, KT9 1AY"
+                    },
+                    "valuations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": {
+                            "type": "string",
+                            "format": "date",
+                            "examples": "1995-01-01T00:00:00Z"
+                          },
+                          "valuation": {
+                            "type": "number",
+                            "format": "double",
+                            "examples": 57953
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "PlanningPermissionResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "property_address_details": {
+                    "type": "object",
+                    "properties": {
+                      "uprn": {
+                        "type": "integer",
+                        "format": "int64",
+                        "examples": 100080689889
+                      },
+                      "property_address": {
+                        "type": "string",
+                        "examples": "2 FERNVILLE LANE HEMEL HEMPSTEAD HP2 4AL"
+                      },
+                      "area_code": {
+                        "type": "string",
+                        "examples": "HP24AL"
+                      }
+                    }
+                  },
+                  "planning_permission": {
+                    "type": "object",
+                    "properties": {
+                      "planning_applications": {
+                        "type": "string",
+                        "format": "nullable"
+                      },
+                      "building_control_applications": {
+                        "type": "string",
+                        "format": "nullable"
+                      }
+                    }
+                  },
+                  "constraints": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "constraint_name": {
+                          "type": "string",
+                          "examples": "Smoke Control Order"
+                        },
+                        "constraint_type": {
+                          "type": "string",
+                          "examples": "Smoke Control Order"
+                        },
+                        "description": {
+                          "type": "string",
+                          "examples": "Smoke Control Order 1972 Borough of Hemel Hempstead (Adeyfield No.2/Town Centre)"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "EnergyPerformanceResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "property_address": {
+                      "type": "string",
+                      "examples": "135 TENNISON ROAD LONDON SE25 5NF"
+                    },
+                    "property_type": {
+                      "type": "string",
+                      "examples": "flats_maisonettes"
+                    },
+                    "property_size": {
+                      "type": "number",
+                      "examples": 37.1
+                    },
+                    "property_size_metric": {
+                      "type": "string",
+                      "examples": "m2"
+                    },
+                    "area_code": {
+                      "type": "string",
+                      "examples": "SE255NF"
+                    },
+                    "EPC": {
+                      "type": "object",
+                      "properties": {
+                        "current_rating": {
+                          "type": "string",
+                          "examples": "E"
+                        },
+                        "current_score": {
+                          "type": "integer",
+                          "examples": 53
+                        },
+                        "expiration_date": {
+                          "type": "string",
+                          "examples": "18 Oct 2028"
+                        },
+                        "status": {
+                          "type": "string",
+                          "examples": "active"
+                        },
+                        "potential_rating": {
+                          "type": "string",
+                          "examples": "C"
+                        },
+                        "potential_score": {
+                          "type": "integer",
+                          "examples": 80
+                        },
+                        "energy_tariff_type": {
+                          "type": "string",
+                          "examples": "Single"
+                        }
+                      }
+                    },
+                    "energy_consumption": {
+                      "type": "object",
+                      "properties": {
+                        "current_annual_energy_consumption": {
+                          "type": "integer",
+                          "examples": 542
+                        },
+                        "potential_annual_energy_consumption": {
+                          "type": "integer",
+                          "examples": 296
+                        },
+                        "energy_consumption_metric": {
+                          "type": "string",
+                          "examples": "kWh/m2"
+                        }
+                      }
+                    },
+                    "annual_energy_costs": {
+                      "type": "object",
+                      "properties": {
+                        "current_annual_lighting_cost": {
+                          "type": "integer",
+                          "examples": 20
+                        },
+                        "potential_annual_lighting_cost": {
+                          "type": "integer",
+                          "examples": 22
+                        },
+                        "current_annual_heating_cost": {
+                          "type": "integer",
+                          "examples": 427
+                        },
+                        "potential_annual_heating_cost": {
+                          "type": "integer",
+                          "examples": 109
+                        },
+                        "current_annual_hot_water_cost": {
+                          "type": "integer",
+                          "examples": 137
+                        },
+                        "potential_annual_hot_water_cost": {
+                          "type": "integer",
+                          "examples": 121
+                        },
+                        "currency": {
+                          "type": "string",
+                          "examples": "GBP"
+                        }
+                      }
+                    },
+                    "savings_and_recommendations": {
+                      "type": "object",
+                      "properties": {
+                        "currency": {
+                          "type": "string",
+                          "examples": "GBP"
+                        },
+                        "energy_saving_recommendations": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "recommendations": {
+                                "type": "string",
+                                "examples": "Heat recovery system for mixer showers"
+                              },
+                              "min_installation_cost": {
+                                "type": "integer",
+                                "examples": 585
+                              },
+                              "max_installation_cost": {
+                                "type": "integer"
+                              }
+                            }
+                          },
+                          "examples": 58
+                        },
+                        "potential_score": {
+                          "type": "integer",
+                          "examples": 77
+                        }
+                      }
+                    },
+                    "annual_CO2_emissions": {
+                      "type": "object",
+                      "properties": {
+                        "current_emissions": {
+                          "type": "number",
+                          "examples": 1.8
+                        },
+                        "potential_emissions": {
+                          "type": "integer",
+                          "examples": 1
+                        },
+                        "emissions_metric": {
+                          "type": "string",
+                          "examples": "tonnes"
+                        },
+                        "current_emissions_per_floor_area": {
+                          "type": "integer",
+                          "examples": 92
+                        },
+                        "emissions_metric_per_floor_area": {
+                          "type": "string",
+                          "examples": "Kg/m2"
+                        }
+                      }
+                    },
+                    "property_efficiency": {
+                      "type": "object",
+                      "properties": {
+                        "hotwater_energy_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "hotwater_environment_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "hotwater_description": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "floor_energy_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "floor_environment_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "floor_description": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "roof_energy_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "roof_environment_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "roof_description": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_windows_energy_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_windows_environment_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_windows_description": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_walls_energy_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_walls_environment_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_walls_description": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_main_heating_energy_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_main_heating_environment_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_main_heating_description": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_main_heating_controls_energy_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_main_heating_controls_environment_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_main_heating_controls_description": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_lighting_energy_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_lighting_environment_efficiency": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_lighting_description": {
+                          "type": "string",
+                          "examples": "Good"
+                        },
+                        "property_secondary_heating_description": {
+                          "type": "string",
+                          "examples": "Good"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "CensusResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "demographics": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "demographic_type": {
+                            "type": "string",
+                            "examples": "gender_distribution"
+                          },
+                          "category": {
+                            "type": "string",
+                            "examples": "Male"
+                          },
+                          "no_of_people": {
+                            "type": "integer",
+                            "examples": 121
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "housing_statistics": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "housing_statistic_type": {
+                            "type": "string",
+                            "examples": "property_type"
+                          },
+                          "category": {
+                            "type": "string",
+                            "examples": "Detached"
+                          },
+                          "no_of_properties": {
+                            "type": "integer",
+                            "examples": 2
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "indicators": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "indicator_type": {
+                            "type": "string",
+                            "examples": "health"
+                          },
+                          "category": {
+                            "type": "string",
+                            "examples": "Very Good"
+                          },
+                          "no_of_people": {
+                            "type": "integer",
+                            "examples": 116
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "AmenitiesResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "amenity_type": {
+                        "type": "string",
+                        "examples": "Opticians"
+                      },
+                      "name": {
+                        "type": "string",
+                        "examples": "Boots-Hatfield"
+                      },
+                      "distance_miles": {
+                        "type": "number",
+                        "examples": 0.7
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "SaleHistoryResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "property_address": {
+                      "type": "string",
+                      "examples": "2, WINDERMERE AVENUE, LONDON, N3 3QY"
+                    },
+                    "uprn": {
+                      "type": "number",
+                      "format": "int64",
+                      "examples": 200127214,
+                      "nullable": true
+                    },
+                    "property_type": {
+                      "type": "string",
+                      "examples": "Property Shell"
+                    },
+                    "transactions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sold_date": {
+                            "type": "string",
+                            "format": "datetime",
+                            "examples": "2001-07-31T00:00:00Z"
+                          },
+                          "sold_price": {
+                            "type": "number",
+                            "format": "double",
+                            "examples": 162500
+                          },
+                          "property_tenure": {
+                            "type": "string",
+                            "examples": "leashold"
+                          },
+                          "price_diff_amount": {
+                            "type": "number",
+                            "format": "double",
+                            "nullable": true
+                          },
+                          "price_diff_percentage": {
+                            "type": "number",
+                            "format": "double",
+                            "nullable": true
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "LHAResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "lha": {
+                    "type": "array",
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "local_authority": {
+                            "type": "string",
+                            "examples": "Welwyn Hatfield"
+                          },
+                          "brma_locaation": {
+                            "type": "string",
+                            "examples": "South East Herts BRMA"
+                          },
+                          "type": {
+                            "type": "string",
+                            "examples": "rent"
+                          },
+                          "month": {
+                            "type": "string",
+                            "examples": "Feb"
+                          },
+                          "year": {
+                            "type": "integer",
+                            "examples": 2025
+                          },
+                          "share_accommodation_price": {
+                            "type": "number",
+                            "examples": 109.32
+                          },
+                          "one_bedroom_price": {
+                            "type": "number",
+                            "examples": 192.16
+                          },
+                          "two_bedroom_price": {
+                            "type": "number",
+                            "examples": 241.64
+                          },
+                          "three_bedroom_price": {
+                            "type": "number",
+                            "examples": 315.29
+                          },
+                          "four_bedroom_price": {
+                            "type": "number",
+                            "examples": 391.23
+                          },
+                          "rent_frequency": {
+                            "type": "string",
+                            "examples": "per_week"
+                          },
+                          "currency": {
+                            "type": "string",
+                            "examples": "GBP"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "GrowthResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/StandardResponse"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "monthly_data": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "area_code_district": {
+                          "type": "string",
+                          "examples": "SE25"
+                        },
+                        "year_month": {
+                          "type": "string",
+                          "examples": "2025-01"
+                        },
+                        "avg_price": {
+                          "type": "number",
+                          "examples": 376645
+                        },
+                        "percentage_change": {
+                          "type": "number",
+                          "examples": 1.39
+                        }
+                      }
+                    }
+                  },
+                  "yearly_data": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "area_code_district": {
+                          "type": "string",
+                          "examples": "SE25"
+                        },
+                        "year_month": {
+                          "type": "string",
+                          "examples": "2020-02"
+                        },
+                        "avg_price": {
+                          "type": "number",
+                          "examples": 349016
+                        },
+                        "percentage_change": {
+                          "type": "number",
+                          "examples": 4.1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "ReportHTMLExample": {
+        "examples": "<!DOCTYPE html>\n<html>  \n<head>\n    <meta charset=\"UTF-8\">\n    <style>\n    body {\n        font-family: system-ui\n    }\n\n    main {\n        display: flex;\n        flex-direction: column;\n        width: 80%;\n        margin: auto;\n        align-items: center;\n        justify-content: center;\n\n    }\n\n    main > section {\n        display: flex;\n        gap: 50px;\n        width: 100%;\n        align-items: center;\n        justify-content: center;\n        margin-top: 5em;\n    }\n\n    svg {\n        display: block;\n        width: 100%;\n        max-width: 800px;\n        height: auto;\n    }\n    </style>\n</head>\n\n<body> <main>\n\n    <img src=\"https://paa.scansanproperties.com/static/images/logos/ScanSan.png\" width=\"200\" style=\"width: 200px\" alt=\"ScanSan\">\n\n\n    <h1>E3 Market Analysis (Feb 2025)</h1>\n\n    <section class=\"price-comparison\">\n         <!-- Generated by SVGo and Plotinum VG --> <svg width=\"1152pt\" height=\"648pt\" viewBox=\"0 0 1152 648\" \txmlns=\"http://www.w3.org/2000/svg\" \txmlns:xlink=\"http://www.w3.org/1999/xlink\"> <g transform=\"scale(1, -1) translate(0, -648)\"> <path d=\"M0,0L1152,0L1152,648L0,648Z\" style=\"fill:#FFFFFF\" /> <text x=\"477.43\" y=\"-623.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Listed Rent Prices </text> <text x=\"431.23\" y=\"-597.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Grouped By Price Category</text> <text x=\"528.91\" y=\"-6.5039\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\">Price PCM / GBP</text> <text x=\"59.725\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">500</text> <text x=\"151.09\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">1000</text> <text x=\"343.81\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">2000</text> <text x=\"921.98\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">5000</text> <text x=\"921.98\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">5000</text> <text x=\"1117.4\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">+Inf</text> <path d=\"M74.725,44.297L74.725,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M171.09,44.297L171.09,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M363.81,44.297L363.81,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M941.98,44.297L941.98,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M941.98,44.297L941.98,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M1134.7,44.297L1134.7,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M74.725,52.297L1134.7,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <g transform=\"rotate(90)\"> <text x=\"205.77\" y=\"15.645\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\"># Properties For Rent</text> </g> <text x=\"46.475\" y=\"-52.977\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">0</text> <text x=\"36.475\" y=\"-279.69\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">80</text> <text x=\"26.475\" y=\"-506.4\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">160</text> <path d=\"M61.475,57.547L69.475,57.547\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,170.9L69.475,170.9\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M61.475,284.26L69.475,284.26\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,397.61L69.475,397.61\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M61.475,510.97L69.475,510.97\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M69.475,57.547L69.475,539.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M74.725,57.547L171.09,57.547L171.09,134.06L74.725,134.06Z\" style=\"fill:#0252A1\" /> <path d=\"M74.725,57.547L171.09,57.547L171.09,134.06L74.725,134.06L74.725,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"114.91\" y=\"-140.56\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">27</text> <path d=\"M171.09,57.547L363.81,57.547L363.81,408.95L171.09,408.95Z\" style=\"fill:#0252A1\" /> <path d=\"M171.09,57.547L363.81,57.547L363.81,408.95L171.09,408.95L171.09,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"255.45\" y=\"-415.45\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">124</text> <path d=\"M363.81,57.547L941.98,57.547L941.98,522.31L363.81,522.31Z\" style=\"fill:#0252A1\" /> <path d=\"M363.81,57.547L941.98,57.547L941.98,522.31L363.81,522.31L363.81,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"640.89\" y=\"-528.8\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">164</text> <path d=\"M941.98,57.547L1134.7,57.547L1134.7,71.716L941.98,71.716Z\" style=\"fill:#0252A1\" /> <path d=\"M941.98,57.547L1134.7,57.547L1134.7,71.716L941.98,71.716L941.98,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"1034.3\" y=\"-78.211\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">5</text> <path d=\"M84.725,524.57L104.72,524.57L104.72,535.85L84.725,535.85Z\" style=\"fill:#0252A1\" /> <path d=\"M84.725,524.57L104.72,524.57L104.72,535.85L84.725,535.85L84.725,524.57\" style=\"fill:none;stroke:#000000\" /> <text x=\"108.72\" y=\"-525.74\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">Feb 25</text> </g> </svg> \n    </section>\n\n    <section class=\"price-comparison\">\n         <!-- Generated by SVGo and Plotinum VG --> <svg width=\"1152pt\" height=\"648pt\" viewBox=\"0 0 1152 648\" \txmlns=\"http://www.w3.org/2000/svg\" \txmlns:xlink=\"http://www.w3.org/1999/xlink\"> <g transform=\"scale(1, -1) translate(0, -648)\"> <path d=\"M0,0L1152,0L1152,648L0,648Z\" style=\"fill:#FFFFFF\" /> <text x=\"379.6\" y=\"-623.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Mean and Median Listed Rent Prices </text> <text x=\"395.47\" y=\"-597.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Grouped By Number of Bedrooms</text> <text x=\"567.71\" y=\"-6.5039\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\"># Bedrooms</text> <text x=\"129.72\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">1</text> <text x=\"371.54\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">2</text> <text x=\"613.36\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">3</text> <text x=\"855.18\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">4</text> <text x=\"1097\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">5</text> <g transform=\"rotate(90)\"> <text x=\"212.96\" y=\"15.645\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\">Price PCM / GBP</text> </g> <text x=\"46.475\" y=\"-44.727\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">0k</text> <text x=\"31.475\" y=\"-284.2\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">2.5k</text> <text x=\"46.475\" y=\"-523.67\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">5k</text> <path d=\"M71.475,49.297L79.475,49.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,97.191L79.475,97.191\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,145.08L79.475,145.08\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,192.98L79.475,192.98\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,240.87L79.475,240.87\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M71.475,288.77L79.475,288.77\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,336.66L79.475,336.66\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,384.55L79.475,384.55\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,432.45L79.475,432.45\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,480.34L79.475,480.34\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M71.475,528.24L79.475,528.24\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M79.475,49.297L79.475,528.24\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M84.725,49.297L84.725,228.04L134.72,228.04L134.72,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M84.725,49.297L84.725,228.04L134.72,228.04L134.72,49.297L84.725,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"93.725\" y=\"-234.53\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">1866</text> <path d=\"M326.54,49.297L326.54,294.99L376.54,294.99L376.54,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M326.54,49.297L326.54,294.99L376.54,294.99L376.54,49.297L326.54,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"335.54\" y=\"-301.49\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">2565</text> <path d=\"M568.36,49.297L568.36,362.91L618.36,362.91L618.36,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M568.36,49.297L568.36,362.91L618.36,362.91L618.36,49.297L568.36,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"577.36\" y=\"-369.4\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">3274</text> <path d=\"M810.18,49.297L810.18,387.62L860.18,387.62L860.18,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M810.18,49.297L810.18,387.62L860.18,387.62L860.18,49.297L810.18,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"819.18\" y=\"-394.11\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">3532</text> <path d=\"M1052,49.297L1052,454.67L1102,454.67L1102,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M1052,49.297L1052,454.67L1102,454.67L1102,49.297L1052,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"1061\" y=\"-461.17\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">4232</text> <path d=\"M134.72,49.297L134.72,226.12L184.72,226.12L184.72,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M134.72,49.297L134.72,226.12L184.72,226.12L184.72,49.297L134.72,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"143.72\" y=\"-232.62\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">1846</text> <path d=\"M376.54,49.297L376.54,283.98L426.54,283.98L426.54,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M376.54,49.297L376.54,283.98L426.54,283.98L426.54,49.297L376.54,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"385.54\" y=\"-290.47\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">2450</text> <path d=\"M618.36,49.297L618.36,346.24L668.36,346.24L668.36,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M618.36,49.297L618.36,346.24L668.36,346.24L668.36,49.297L618.36,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"627.36\" y=\"-352.73\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">3100</text> <path d=\"M860.18,49.297L860.18,374.98L910.18,374.98L910.18,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M860.18,49.297L860.18,374.98L910.18,374.98L910.18,49.297L860.18,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"869.18\" y=\"-381.47\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">3400</text> <path d=\"M1102,49.297L1102,432.45L1152,432.45L1152,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M1102,49.297L1102,432.45L1152,432.45L1152,49.297L1102,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"1111\" y=\"-438.94\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">4000</text> <path d=\"M134.72,524.57L134.72,535.85L154.72,535.85L154.72,524.57Z\" style=\"fill:#0252A1\" /> <path d=\"M134.72,524.57L134.72,535.85L154.72,535.85L154.72,524.57L134.72,524.57\" style=\"fill:none;stroke:#000000\" /> <text x=\"158.72\" y=\"-525.74\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">Mean</text> <path d=\"M134.72,504.8L134.72,516.07L154.72,516.07L154.72,504.8Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M134.72,504.8L134.72,516.07L154.72,516.07L154.72,504.8L134.72,504.8\" style=\"fill:none;stroke:#000000\" /> <text x=\"158.72\" y=\"-505.96\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">Median</text> </g> </svg> \n    </section>\n\n    <section class=\"price-comparison\">\n         <!-- Generated by SVGo and Plotinum VG --> <svg width=\"1152pt\" height=\"648pt\" viewBox=\"0 0 1152 648\" \txmlns=\"http://www.w3.org/2000/svg\" \txmlns:xlink=\"http://www.w3.org/1999/xlink\"> <g transform=\"scale(1, -1) translate(0, -648)\"> <path d=\"M0,0L1152,0L1152,648L0,648Z\" style=\"fill:#FFFFFF\" /> <text x=\"379.6\" y=\"-623.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Mean and Median Listed Rent Prices </text> <text x=\"435.25\" y=\"-597.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Grouped By Property Type</text> <text x=\"562.26\" y=\"-6.5039\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\">Property Type</text> <text x=\"129.72\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">Flat</text> <text x=\"598.09\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">House</text> <text x=\"1077.6\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">Room</text> <g transform=\"rotate(90)\"> <text x=\"218.5\" y=\"15.645\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\">Price PCM / GBP</text> </g> <text x=\"46.475\" y=\"-44.727\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">0k</text> <text x=\"46.475\" y=\"-173.68\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">1k</text> <text x=\"46.475\" y=\"-302.63\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">2k</text> <text x=\"46.475\" y=\"-431.58\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">3k</text> <path d=\"M71.475,49.297L79.475,49.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,75.087L79.475,75.087\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,100.88L79.475,100.88\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,126.67L79.475,126.67\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,152.46L79.475,152.46\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M71.475,178.25L79.475,178.25\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,204.04L79.475,204.04\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,229.83L79.475,229.83\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,255.62L79.475,255.62\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,281.41L79.475,281.41\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M71.475,307.2L79.475,307.2\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,332.99L79.475,332.99\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,358.78L79.475,358.78\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,384.57L79.475,384.57\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,410.36L79.475,410.36\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M71.475,436.15L79.475,436.15\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,461.94L79.475,461.94\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,487.73L79.475,487.73\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,513.52L79.475,513.52\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M75.475,539.31L79.475,539.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M79.475,49.297L79.475,539.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M95.281,49.297L95.281,352.72L145.28,352.72L145.28,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M95.281,49.297L95.281,352.72L145.28,352.72L145.28,49.297L95.281,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"104.28\" y=\"-359.21\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">2353</text> <path d=\"M573.64,49.297L573.64,530.93L623.64,530.93L623.64,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M573.64,49.297L573.64,530.93L623.64,530.93L623.64,49.297L573.64,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"582.64\" y=\"-537.42\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">3735</text> <path d=\"M1052,49.297L1052,177.73L1102,177.73L1102,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M1052,49.297L1052,177.73L1102,177.73L1102,49.297L1052,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"1065\" y=\"-184.23\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">996</text> <path d=\"M145.28,49.297L145.28,332.99L195.28,332.99L195.28,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M145.28,49.297L145.28,332.99L195.28,332.99L195.28,49.297L145.28,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"154.28\" y=\"-339.48\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">2200</text> <path d=\"M623.64,49.297L623.64,500.62L673.64,500.62L673.64,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M623.64,49.297L623.64,500.62L673.64,500.62L673.64,49.297L623.64,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"632.64\" y=\"-507.12\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">3500</text> <path d=\"M1102,49.297L1102,166.64L1152,166.64L1152,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M1102,49.297L1102,166.64L1152,166.64L1152,49.297L1102,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"1115\" y=\"-173.14\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">910</text> <path d=\"M115.28,524.57L115.28,535.85L135.28,535.85L135.28,524.57Z\" style=\"fill:#0252A1\" /> <path d=\"M115.28,524.57L115.28,535.85L135.28,535.85L135.28,524.57L115.28,524.57\" style=\"fill:none;stroke:#000000\" /> <text x=\"139.28\" y=\"-525.74\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">Mean</text> <path d=\"M115.28,504.8L115.28,516.07L135.28,516.07L135.28,504.8Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M115.28,504.8L115.28,516.07L135.28,516.07L135.28,504.8L115.28,504.8\" style=\"fill:none;stroke:#000000\" /> <text x=\"139.28\" y=\"-505.96\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">Median</text> </g> </svg> \n    </section>\n\n    <section class=\"price-comparison\">\n         <!-- Generated by SVGo and Plotinum VG --> <svg width=\"1152pt\" height=\"648pt\" viewBox=\"0 0 1152 648\" \txmlns=\"http://www.w3.org/2000/svg\" \txmlns:xlink=\"http://www.w3.org/1999/xlink\"> <g transform=\"scale(1, -1) translate(0, -648)\"> <path d=\"M0,0L1152,0L1152,648L0,648Z\" style=\"fill:#FFFFFF\" /> <text x=\"474.55\" y=\"-623.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Listed Sales Prices </text> <text x=\"431.23\" y=\"-597.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Grouped By Price Category</text> <text x=\"504.73\" y=\"-6.5039\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\">Listed Sale Price / GBP</text> <text x=\"69.725\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">0</text> <text x=\"143.06\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">100k</text> <text x=\"231.39\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">200k</text> <text x=\"319.72\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">300k</text> <text x=\"408.05\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">400k</text> <text x=\"496.38\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">500k</text> <text x=\"933.04\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">1000k</text> <text x=\"933.04\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">1000k</text> <text x=\"1117.4\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">+Inf</text> <path d=\"M74.725,44.297L74.725,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M163.06,44.297L163.06,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M251.39,44.297L251.39,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M339.72,44.297L339.72,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M428.05,44.297L428.05,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M516.38,44.297L516.38,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M958.04,44.297L958.04,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M958.04,44.297L958.04,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M1134.7,44.297L1134.7,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M74.725,52.297L1134.7,52.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <g transform=\"rotate(90)\"> <text x=\"208.54\" y=\"15.645\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\"># Properties For Sale</text> </g> <text x=\"46.475\" y=\"-52.977\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">0</text> <text x=\"26.475\" y=\"-271.96\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">100</text> <text x=\"26.475\" y=\"-490.94\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">200</text> <path d=\"M61.475,57.547L69.475,57.547\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,101.34L69.475,101.34\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,145.14L69.475,145.14\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,188.94L69.475,188.94\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,232.73L69.475,232.73\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M61.475,276.53L69.475,276.53\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,320.33L69.475,320.33\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,364.12L69.475,364.12\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,407.92L69.475,407.92\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,451.72L69.475,451.72\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M61.475,495.51L69.475,495.51\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M65.475,539.31L69.475,539.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M69.475,57.547L69.475,539.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M74.725,57.547L163.06,57.547L163.06,72.876L74.725,72.876Z\" style=\"fill:#0252A1\" /> <path d=\"M74.725,57.547L163.06,57.547L163.06,72.876L74.725,72.876L74.725,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"114.89\" y=\"-79.37\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">7</text> <path d=\"M163.06,57.547L251.39,57.547L251.39,121.05L163.06,121.05Z\" style=\"fill:#0252A1\" /> <path d=\"M163.06,57.547L251.39,57.547L251.39,121.05L163.06,121.05L163.06,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"199.22\" y=\"-127.55\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">29</text> <path d=\"M251.39,57.547L339.72,57.547L339.72,188.94L251.39,188.94Z\" style=\"fill:#0252A1\" /> <path d=\"M251.39,57.547L339.72,57.547L339.72,188.94L251.39,188.94L251.39,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"287.55\" y=\"-195.43\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">60</text> <path d=\"M339.72,57.547L428.05,57.547L428.05,515.22L339.72,515.22Z\" style=\"fill:#0252A1\" /> <path d=\"M339.72,57.547L428.05,57.547L428.05,515.22L339.72,515.22L339.72,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"371.88\" y=\"-521.72\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">209</text> <path d=\"M428.05,57.547L516.38,57.547L516.38,377.26L428.05,377.26Z\" style=\"fill:#0252A1\" /> <path d=\"M428.05,57.547L516.38,57.547L516.38,377.26L428.05,377.26L428.05,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"460.22\" y=\"-383.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">146</text> <path d=\"M516.38,57.547L958.04,57.547L958.04,372.88L516.38,372.88Z\" style=\"fill:#0252A1\" /> <path d=\"M516.38,57.547L958.04,57.547L958.04,372.88L516.38,372.88L516.38,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"725.21\" y=\"-379.38\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">144</text> <path d=\"M958.04,57.547L1134.7,57.547L1134.7,70.686L958.04,70.686Z\" style=\"fill:#0252A1\" /> <path d=\"M958.04,57.547L1134.7,57.547L1134.7,70.686L958.04,70.686L958.04,57.547\" style=\"fill:none;stroke:#000000\" /> <text x=\"1042.4\" y=\"-77.181\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">6</text> <path d=\"M84.725,524.57L104.72,524.57L104.72,535.85L84.725,535.85Z\" style=\"fill:#0252A1\" /> <path d=\"M84.725,524.57L104.72,524.57L104.72,535.85L84.725,535.85L84.725,524.57\" style=\"fill:none;stroke:#000000\" /> <text x=\"108.72\" y=\"-525.74\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">Feb 25</text> </g> </svg> \n    </section>\n\n    <section class=\"price-comparison\">\n         <!-- Generated by SVGo and Plotinum VG --> <svg width=\"1152pt\" height=\"648pt\" viewBox=\"0 0 1152 648\" \txmlns=\"http://www.w3.org/2000/svg\" \txmlns:xlink=\"http://www.w3.org/1999/xlink\"> <g transform=\"scale(1, -1) translate(0, -648)\"> <path d=\"M0,0L1152,0L1152,648L0,648Z\" style=\"fill:#FFFFFF\" /> <text x=\"376.72\" y=\"-623.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Mean and Median Listed Sales Prices </text> <text x=\"395.47\" y=\"-597.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Grouped By Number of Bedrooms</text> <text x=\"580.29\" y=\"-6.5039\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\"># Bedrooms</text> <text x=\"154.88\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">1</text> <text x=\"390.41\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">2</text> <text x=\"625.94\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">3</text> <text x=\"861.47\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">4</text> <text x=\"1097\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">5</text> <g transform=\"rotate(90)\"> <text x=\"194.32\" y=\"15.645\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\">Listed Sale Price / GBP</text> </g> <text x=\"71.631\" y=\"-44.727\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">0k</text> <text x=\"51.631\" y=\"-184.73\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">400k</text> <text x=\"51.631\" y=\"-324.73\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">800k</text> <text x=\"48.848\" y=\"-464.74\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">1.2M</text> <path d=\"M96.631,49.297L104.63,49.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,84.298L104.63,84.298\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,119.3L104.63,119.3\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,154.3L104.63,154.3\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M96.631,189.3L104.63,189.3\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,224.3L104.63,224.3\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,259.3L104.63,259.3\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,294.3L104.63,294.3\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M96.631,329.3L104.63,329.3\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,364.31L104.63,364.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,399.31L104.63,399.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,434.31L104.63,434.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M96.631,469.31L104.63,469.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,504.31L104.63,504.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M100.63,539.31L104.63,539.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M104.63,49.297L104.63,539.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M109.88,49.297L109.88,169.04L159.88,169.04L159.88,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M109.88,49.297L109.88,169.04L159.88,169.04L159.88,49.297L109.88,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"109.18\" y=\"-175.53\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">342.11k</text> <path d=\"M345.41,49.297L345.41,214.82L395.41,214.82L395.41,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M345.41,49.297L345.41,214.82L395.41,214.82L395.41,49.297L345.41,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"348.41\" y=\"-221.31\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">472.9k</text> <path d=\"M580.94,49.297L580.94,249.11L630.94,249.11L630.94,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M580.94,49.297L580.94,249.11L630.94,249.11L630.94,49.297L580.94,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"579.94\" y=\"-255.61\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">570.89k</text> <path d=\"M816.47,49.297L816.47,343.83L866.47,343.83L866.47,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M816.47,49.297L816.47,343.83L866.47,343.83L866.47,49.297L816.47,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"819.47\" y=\"-350.32\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">841.5k</text> <path d=\"M1052,49.297L1052,520.93L1102,520.93L1102,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M1052,49.297L1052,520.93L1102,520.93L1102,49.297L1052,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"1055.9\" y=\"-527.43\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">1.35M</text> <path d=\"M159.88,49.297L159.88,171.8L209.88,171.8L209.88,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M159.88,49.297L159.88,171.8L209.88,171.8L209.88,49.297L159.88,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"168.88\" y=\"-178.29\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">350k</text> <path d=\"M395.41,49.297L395.41,206.8L445.41,206.8L445.41,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M395.41,49.297L395.41,206.8L445.41,206.8L445.41,49.297L395.41,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"404.41\" y=\"-213.3\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">450k</text> <path d=\"M630.94,49.297L630.94,237.43L680.94,237.43L680.94,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M630.94,49.297L630.94,237.43L680.94,237.43L680.94,49.297L630.94,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"633.94\" y=\"-243.92\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">537.5k</text> <path d=\"M866.47,49.297L866.47,345.05L916.47,345.05L916.47,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M866.47,49.297L866.47,345.05L916.47,345.05L916.47,49.297L866.47,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"875.47\" y=\"-351.55\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">845k</text> <path d=\"M1102,49.297L1102,520.93L1152,520.93L1152,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M1102,49.297L1102,520.93L1152,520.93L1152,49.297L1102,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"1105.9\" y=\"-527.43\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">1.35M</text> <path d=\"M129.88,524.57L129.88,535.85L149.88,535.85L149.88,524.57Z\" style=\"fill:#0252A1\" /> <path d=\"M129.88,524.57L129.88,535.85L149.88,535.85L149.88,524.57L129.88,524.57\" style=\"fill:none;stroke:#000000\" /> <text x=\"153.88\" y=\"-525.74\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">Mean</text> <path d=\"M129.88,504.8L129.88,516.07L149.88,516.07L149.88,504.8Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M129.88,504.8L129.88,516.07L149.88,516.07L149.88,504.8L129.88,504.8\" style=\"fill:none;stroke:#000000\" /> <text x=\"153.88\" y=\"-505.96\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">Median</text> </g> </svg> \n    </section>\n\n    <section class=\"price-comparison\">\n         <!-- Generated by SVGo and Plotinum VG --> <svg width=\"1152pt\" height=\"648pt\" viewBox=\"0 0 1152 648\" \txmlns=\"http://www.w3.org/2000/svg\" \txmlns:xlink=\"http://www.w3.org/1999/xlink\"> <g transform=\"scale(1, -1) translate(0, -648)\"> <path d=\"M0,0L1152,0L1152,648L0,648Z\" style=\"fill:#FFFFFF\" /> <text x=\"376.72\" y=\"-623.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Mean and Median Listed Sales Prices </text> <text x=\"435.25\" y=\"-597.76\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:26px\">Grouped By Property Type</text> <text x=\"578.44\" y=\"-6.5039\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\">Property Type</text> <text x=\"139.88\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">Detached</text> <text x=\"470.2\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">Flat</text> <text x=\"734.46\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">Semi-detached</text> <text x=\"1067.2\" y=\"-28.652\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">Terraced</text> <g transform=\"rotate(90)\"> <text x=\"194.32\" y=\"15.645\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:bold;font-style:normal;font-size:20px\">Listed Sale Price / GBP</text> </g> <text x=\"56.631\" y=\"-44.727\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">0k</text> <text x=\"36.631\" y=\"-262.51\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">400k</text> <text x=\"36.631\" y=\"-480.29\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:20px\">800k</text> <path d=\"M81.631,49.297L89.631,49.297\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M85.631,103.74L89.631,103.74\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M85.631,158.19L89.631,158.19\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M85.631,212.63L89.631,212.63\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M81.631,267.08L89.631,267.08\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M85.631,321.53L89.631,321.53\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M85.631,375.97L89.631,375.97\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M85.631,430.42L89.631,430.42\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M81.631,484.86L89.631,484.86\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M85.631,539.31L89.631,539.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M89.631,49.297L89.631,539.31\" style=\"fill:none;stroke:#000000;stroke-width:0.5\" /> <path d=\"M127.63,49.297L127.63,479.42L177.63,479.42L177.63,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M127.63,49.297L127.63,479.42L177.63,479.42L177.63,49.297L127.63,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"136.63\" y=\"-485.91\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">790k</text> <path d=\"M435.76,49.297L435.76,276.2L485.76,276.2L485.76,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M435.76,49.297L435.76,276.2L485.76,276.2L485.76,49.297L435.76,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"434.76\" y=\"-282.7\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">416.76k</text> <path d=\"M743.88,49.297L743.88,441.31L793.88,441.31L793.88,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M743.88,49.297L743.88,441.31L793.88,441.31L793.88,49.297L743.88,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"752.88\" y=\"-447.8\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">720k</text> <path d=\"M1052,49.297L1052,534.7L1102,534.7L1102,49.297Z\" style=\"fill:#0252A1\" /> <path d=\"M1052,49.297L1052,534.7L1102,534.7L1102,49.297L1052,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"1051\" y=\"-541.2\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">891.54k</text> <path d=\"M177.63,49.297L177.63,410L227.63,410L227.63,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M177.63,49.297L177.63,410L227.63,410L227.63,49.297L177.63,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"180.63\" y=\"-416.5\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">662.5k</text> <path d=\"M485.76,49.297L485.76,267.08L535.76,267.08L535.76,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M485.76,49.297L485.76,267.08L535.76,267.08L535.76,49.297L485.76,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"494.76\" y=\"-273.58\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">400k</text> <path d=\"M793.88,49.297L793.88,321.53L843.88,321.53L843.88,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M793.88,49.297L793.88,321.53L843.88,321.53L843.88,49.297L793.88,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"802.88\" y=\"-328.02\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">500k</text> <path d=\"M1102,49.297L1102,512.09L1152,512.09L1152,49.297Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M1102,49.297L1102,512.09L1152,512.09L1152,49.297L1102,49.297\" style=\"fill:none;stroke:#000000\" /> <text x=\"1111\" y=\"-518.58\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">850k</text> <path d=\"M182.63,524.57L182.63,535.85L202.63,535.85L202.63,524.57Z\" style=\"fill:#0252A1\" /> <path d=\"M182.63,524.57L182.63,535.85L202.63,535.85L202.63,524.57L182.63,524.57\" style=\"fill:none;stroke:#000000\" /> <text x=\"206.63\" y=\"-525.74\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">Mean</text> <path d=\"M182.63,504.8L182.63,516.07L202.63,516.07L202.63,504.8Z\" style=\"fill:#0268CD;fill-opacity:0.78431\" /> <path d=\"M182.63,504.8L182.63,516.07L202.63,516.07L202.63,504.8L182.63,504.8\" style=\"fill:none;stroke:#000000\" /> <text x=\"206.63\" y=\"-505.96\" transform=\"scale(1, -1)\" \tstyle=\"font-family:Liberation Serif;font-variant:normal;font-weight:normal;font-style:normal;font-size:16px\">Median</text> </g> </svg> \n    </section>\n    <footer>\n    &copy; 2025. ScanSan Properties. All rights reserved.\n    </footer>\n</main> </body> </html>\n"
+      }
+    }
+  }
+}
