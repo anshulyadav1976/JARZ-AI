@@ -612,9 +612,9 @@ export default function Home() {
                           onRemoveArea={handleRemoveCompareArea}
                         />
                         
-                        {/* Main Insights */}
+                        {/* Main Insights - pass full A2UI state for valuation (needs chart, map, explanation, prediction) */}
                         <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-1 border border-border shadow-lg">
-                          <A2UIRenderer state={filterA2UIByPath('prediction')} />
+                          <A2UIRenderer state={state.a2uiState} />
                         </div>
                         
                         {/* Investment Calculator (if we have prediction data) */}

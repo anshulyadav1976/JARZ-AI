@@ -5,17 +5,222 @@ These tools allow the LLM to interact with the rental valuation system.
 The LLM decides when to call these tools based on user queries.
 Tool results are cached so repeated requests (same args) return fast for demos.
 """
+import random
 import re
 from typing import Any, Optional
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
-from ..schemas import UserQuery, PredictionResult, ExplanationResult, ResolvedLocation, Neighbor
+from ..schemas import UserQuery, PredictionResult, ExplanationResult, ResolvedLocation, Neighbor, Driver, PredictionMetadata
 from ..feature_builder import build_features
 from ..model_adapter import get_model_adapter
 from ..explain import explain_prediction
 from ..a2ui_builder import build_complete_ui, build_listings_cards, build_location_comparison_ui
 from ..scansan_client import get_scansan_client
 from .. import cache as tool_cache
+
+
+# =============================================================================
+# MOCK DATA SETS (3 rotating sets for demo when model isn't available)
+# =============================================================================
+# Each set contains complete data for: prediction, explanation, location,
+# neighbors, and is used to generate full A2UI visuals for demos.
+# =============================================================================
+
+def _get_mock_data_sets():
+    """Return 3 complete mock data sets for rent forecast demos."""
+    
+    # Set 1: Camden (NW1) - High-demand central London
+    set_1 = {
+        "location": ResolvedLocation(
+            area_code="NW1",
+            area_code_district="NW1",
+            display_name="Camden, NW1",
+            lat=51.5388,
+            lon=-0.1426,
+        ),
+        "prediction": PredictionResult(
+            p10=2150.0,
+            p50=2650.0,
+            p90=3200.0,
+            unit="GBP/month",
+            horizon_months=6,
+            metadata=PredictionMetadata(
+                model_version="mock-demo-v1",
+                feature_version="v1",
+                timestamp=datetime.utcnow(),
+            ),
+        ),
+        "explanation": ExplanationResult(
+            drivers=[
+                Driver(name="Rental Demand Index", contribution=185.0, direction="positive"),
+                Driver(name="Year-over-Year Growth", contribution=120.0, direction="positive"),
+                Driver(name="Neighboring Area Rents", contribution=95.0, direction="positive"),
+                Driver(name="Seasonal Demand (Summer)", contribution=75.0, direction="positive"),
+                Driver(name="Transport Links", contribution=60.0, direction="positive"),
+                Driver(name="Market Liquidity", contribution=45.0, direction="positive"),
+            ],
+            base_value=2200.0,
+        ),
+        "neighbors": [
+            Neighbor(area_code="NW3", display_name="Hampstead", lat=51.5565, lon=-0.1782, avg_rent=2800.0, demand_index=82.0, distance_km=2.1),
+            Neighbor(area_code="NW5", display_name="Kentish Town", lat=51.5508, lon=-0.1411, avg_rent=2200.0, demand_index=78.0, distance_km=1.4),
+            Neighbor(area_code="N1", display_name="Islington", lat=51.5362, lon=-0.1033, avg_rent=2500.0, demand_index=85.0, distance_km=2.8),
+            Neighbor(area_code="WC1", display_name="Bloomsbury", lat=51.5246, lon=-0.1217, avg_rent=2750.0, demand_index=80.0, distance_km=1.9),
+            Neighbor(area_code="NW8", display_name="St John's Wood", lat=51.5344, lon=-0.1747, avg_rent=3100.0, demand_index=76.0, distance_km=2.3),
+        ],
+        "summary_template": "Camden (NW1) 6mo forecast: £2,650 (P10: £2,150, P90: £3,200). Key factors: Rental Demand Index (increasing rent by ~185 GBP), Year-over-Year Growth (increasing rent by ~120 GBP), Neighboring Area Rents (increasing rent by ~95 GBP).",
+    }
+    
+    # Set 2: Canary Wharf (E14) - Financial district, high-rise
+    set_2 = {
+        "location": ResolvedLocation(
+            area_code="E14",
+            area_code_district="E14",
+            display_name="Canary Wharf, E14",
+            lat=51.5054,
+            lon=-0.0235,
+        ),
+        "prediction": PredictionResult(
+            p10=1850.0,
+            p50=2350.0,
+            p90=2900.0,
+            unit="GBP/month",
+            horizon_months=6,
+            metadata=PredictionMetadata(
+                model_version="mock-demo-v1",
+                feature_version="v1",
+                timestamp=datetime.utcnow(),
+            ),
+        ),
+        "explanation": ExplanationResult(
+            drivers=[
+                Driver(name="Corporate Demand", contribution=165.0, direction="positive"),
+                Driver(name="Transport Links (Jubilee/Elizabeth)", contribution=140.0, direction="positive"),
+                Driver(name="New Build Premium", contribution=110.0, direction="positive"),
+                Driver(name="Year-over-Year Growth", contribution=85.0, direction="positive"),
+                Driver(name="Amenities Score", contribution=70.0, direction="positive"),
+                Driver(name="Limited Supply", contribution=55.0, direction="positive"),
+            ],
+            base_value=1950.0,
+        ),
+        "neighbors": [
+            Neighbor(area_code="E1", display_name="Whitechapel", lat=51.5152, lon=-0.0597, avg_rent=2100.0, demand_index=79.0, distance_km=3.2),
+            Neighbor(area_code="SE10", display_name="Greenwich", lat=51.4769, lon=-0.0005, avg_rent=1900.0, demand_index=75.0, distance_km=2.8),
+            Neighbor(area_code="E16", display_name="Royal Docks", lat=51.5077, lon=0.0469, avg_rent=1750.0, demand_index=72.0, distance_km=3.5),
+            Neighbor(area_code="SE16", display_name="Rotherhithe", lat=51.4978, lon=-0.0522, avg_rent=1850.0, demand_index=74.0, distance_km=2.4),
+            Neighbor(area_code="E3", display_name="Bow", lat=51.5287, lon=-0.0186, avg_rent=1950.0, demand_index=77.0, distance_km=2.9),
+        ],
+        "summary_template": "Canary Wharf (E14) 6mo forecast: £2,350 (P10: £1,850, P90: £2,900). Key factors: Corporate Demand (increasing rent by ~165 GBP), Transport Links (increasing rent by ~140 GBP), New Build Premium (increasing rent by ~110 GBP).",
+    }
+    
+    # Set 3: Chelsea (SW3) - Prime central London, luxury
+    set_3 = {
+        "location": ResolvedLocation(
+            area_code="SW3",
+            area_code_district="SW3",
+            display_name="Chelsea, SW3",
+            lat=51.4875,
+            lon=-0.1687,
+        ),
+        "prediction": PredictionResult(
+            p10=3200.0,
+            p50=4100.0,
+            p90=5200.0,
+            unit="GBP/month",
+            horizon_months=6,
+            metadata=PredictionMetadata(
+                model_version="mock-demo-v1",
+                feature_version="v1",
+                timestamp=datetime.utcnow(),
+            ),
+        ),
+        "explanation": ExplanationResult(
+            drivers=[
+                Driver(name="Prime Location Premium", contribution=420.0, direction="positive"),
+                Driver(name="International Demand", contribution=280.0, direction="positive"),
+                Driver(name="Neighboring Area Rents", contribution=195.0, direction="positive"),
+                Driver(name="Property Quality Index", contribution=150.0, direction="positive"),
+                Driver(name="Year-over-Year Growth", contribution=110.0, direction="positive"),
+                Driver(name="School Catchment Premium", contribution=85.0, direction="positive"),
+            ],
+            base_value=3400.0,
+        ),
+        "neighbors": [
+            Neighbor(area_code="SW1", display_name="Belgravia", lat=51.4975, lon=-0.1505, avg_rent=4500.0, demand_index=88.0, distance_km=1.5),
+            Neighbor(area_code="SW7", display_name="South Kensington", lat=51.4941, lon=-0.1749, avg_rent=3800.0, demand_index=85.0, distance_km=0.9),
+            Neighbor(area_code="SW10", display_name="West Brompton", lat=51.4803, lon=-0.1885, avg_rent=2900.0, demand_index=78.0, distance_km=1.8),
+            Neighbor(area_code="W8", display_name="Kensington", lat=51.5009, lon=-0.1925, avg_rent=3600.0, demand_index=84.0, distance_km=2.1),
+            Neighbor(area_code="SW5", display_name="Earl's Court", lat=51.4903, lon=-0.1950, avg_rent=2650.0, demand_index=76.0, distance_km=1.6),
+        ],
+        "summary_template": "Chelsea (SW3) 6mo forecast: £4,100 (P10: £3,200, P90: £5,200). Key factors: Prime Location Premium (increasing rent by ~420 GBP), International Demand (increasing rent by ~280 GBP), Neighboring Area Rents (increasing rent by ~195 GBP).",
+    }
+    
+    return [set_1, set_2, set_3]
+
+
+def _get_random_mock_forecast(location_input: str, horizon_months: int = 6) -> dict:
+    """
+    Get a random mock forecast data set and adapt it to the requested location.
+    
+    Returns a dict with: prediction, explanation, location, neighbors, summary
+    """
+    mock_sets = _get_mock_data_sets()
+    mock = random.choice(mock_sets)
+    
+    # Adapt location name to user input if it looks like a postcode
+    location_input_upper = location_input.strip().upper()
+    
+    # Create adapted location
+    adapted_location = ResolvedLocation(
+        area_code=mock["location"].area_code,
+        area_code_district=mock["location"].area_code_district,
+        display_name=f"{location_input_upper} (demo data)",
+        lat=mock["location"].lat,
+        lon=mock["location"].lon,
+    )
+    
+    # Adapt prediction horizon
+    adapted_prediction = PredictionResult(
+        p10=mock["prediction"].p10,
+        p50=mock["prediction"].p50,
+        p90=mock["prediction"].p90,
+        unit=mock["prediction"].unit,
+        horizon_months=horizon_months,
+        metadata=PredictionMetadata(
+            model_version="mock-demo-v1",
+            feature_version="v1",
+            timestamp=datetime.utcnow(),
+        ),
+    )
+    
+    # Generate summary
+    area_name = adapted_location.display_name
+    top_drivers = mock["explanation"].drivers[:3]
+    driver_text = ""
+    if top_drivers:
+        driver_parts = []
+        for d in top_drivers:
+            direction = "increasing" if d.direction == "positive" else "decreasing"
+            driver_parts.append(f"{d.name} ({direction} rent by ~{d.contribution:.0f} GBP)")
+        driver_text = f" Key factors: {', '.join(driver_parts)}."
+    
+    summary = (
+        f"{area_name} {horizon_months}mo forecast: "
+        f"£{adapted_prediction.p50:,.0f} (P10: £{adapted_prediction.p10:,.0f}, P90: £{adapted_prediction.p90:,.0f})"
+        f"{driver_text}"
+    )
+    
+    return {
+        "prediction": adapted_prediction,
+        "explanation": mock["explanation"],
+        "location": adapted_location,
+        "neighbors": mock["neighbors"],
+        "summary": summary,
+    }
+
+
+# =============================================================================
 
 
 @dataclass
@@ -279,6 +484,9 @@ async def execute_get_rent_forecast(
     4. Generate explanation
     5. Build A2UI components
     
+    If the pipeline fails (model not available, location not resolved, etc.),
+    falls back to one of 3 rotating mock data sets to show UI mockups for demos.
+    
     Args:
         location: Location string (postcode, area name)
         horizon_months: Forecast horizon (1, 3, 6, or 12)
@@ -287,51 +495,84 @@ async def execute_get_rent_forecast(
     Returns:
         RentForecastResult with prediction, explanation, and UI components
     """
-    # Build query
-    query = UserQuery(
-        location_input=location,
-        horizon_months=horizon_months,
-        view_mode="single",
-        k_neighbors=k_neighbors,
-        radius_km=5.0,
-    )
+    try:
+        # Build query
+        query = UserQuery(
+            location_input=location,
+            horizon_months=horizon_months,
+            view_mode="single",
+            k_neighbors=k_neighbors,
+            radius_km=5.0,
+        )
+        
+        # Build features (includes location resolution and neighbor fetch)
+        features, resolved_location, neighbors = await build_features(query)
+        
+        # Run prediction
+        adapter = get_model_adapter()
+        prediction = adapter.predict_quantiles(features)
+        
+        # Generate explanation
+        explanation = explain_prediction(features, prediction)
+        
+        # Build A2UI messages
+        a2ui_messages = build_complete_ui(
+            prediction=prediction,
+            explanation=explanation,
+            location=resolved_location,
+            neighbors=neighbors,
+            horizon_months=horizon_months,
+            k_neighbors=k_neighbors,
+        )
+        
+        # Generate text summary for the LLM to use
+        summary = _generate_forecast_summary(
+            prediction=prediction,
+            location=resolved_location,
+            explanation=explanation,
+            horizon_months=horizon_months,
+        )
+        
+        return RentForecastResult(
+            prediction=prediction.model_dump() if hasattr(prediction, 'model_dump') else prediction.__dict__,
+            explanation=explanation.model_dump() if hasattr(explanation, 'model_dump') else explanation.__dict__,
+            location=resolved_location.model_dump() if hasattr(resolved_location, 'model_dump') else resolved_location.__dict__,
+            neighbors=[n.model_dump() if hasattr(n, 'model_dump') else n.__dict__ for n in neighbors],
+            a2ui_messages=a2ui_messages,
+            summary=summary,
+        )
     
-    # Build features (includes location resolution and neighbor fetch)
-    features, resolved_location, neighbors = await build_features(query)
-    
-    # Run prediction
-    adapter = get_model_adapter()
-    prediction = adapter.predict_quantiles(features)
-    
-    # Generate explanation
-    explanation = explain_prediction(features, prediction)
-    
-    # Build A2UI messages
-    a2ui_messages = build_complete_ui(
-        prediction=prediction,
-        explanation=explanation,
-        location=resolved_location,
-        neighbors=neighbors,
-        horizon_months=horizon_months,
-        k_neighbors=k_neighbors,
-    )
-    
-    # Generate text summary for the LLM to use
-    summary = _generate_forecast_summary(
-        prediction=prediction,
-        location=resolved_location,
-        explanation=explanation,
-        horizon_months=horizon_months,
-    )
-    
-    return RentForecastResult(
-        prediction=prediction.model_dump() if hasattr(prediction, 'model_dump') else prediction.__dict__,
-        explanation=explanation.model_dump() if hasattr(explanation, 'model_dump') else explanation.__dict__,
-        location=resolved_location.model_dump() if hasattr(resolved_location, 'model_dump') else resolved_location.__dict__,
-        neighbors=[n.model_dump() if hasattr(n, 'model_dump') else n.__dict__ for n in neighbors],
-        a2ui_messages=a2ui_messages,
-        summary=summary,
-    )
+    except Exception as e:
+        # =====================================================================
+        # FALLBACK: Use mock data for demo when real pipeline fails
+        # =====================================================================
+        print(f"[RENT_FORECAST] Pipeline error, using mock data: {e}")
+        
+        mock = _get_random_mock_forecast(location, horizon_months)
+        mock_prediction = mock["prediction"]
+        mock_explanation = mock["explanation"]
+        mock_location = mock["location"]
+        mock_neighbors = mock["neighbors"]
+        mock_summary = mock["summary"]
+        
+        # Build A2UI messages from mock data
+        a2ui_messages = build_complete_ui(
+            prediction=mock_prediction,
+            explanation=mock_explanation,
+            location=mock_location,
+            neighbors=mock_neighbors,
+            horizon_months=horizon_months,
+            k_neighbors=k_neighbors,
+        )
+        
+        return RentForecastResult(
+            prediction=mock_prediction.model_dump() if hasattr(mock_prediction, 'model_dump') else mock_prediction.__dict__,
+            explanation=mock_explanation.model_dump() if hasattr(mock_explanation, 'model_dump') else mock_explanation.__dict__,
+            location=mock_location.model_dump() if hasattr(mock_location, 'model_dump') else mock_location.__dict__,
+            neighbors=[n.model_dump() if hasattr(n, 'model_dump') else n.__dict__ for n in mock_neighbors],
+            a2ui_messages=a2ui_messages,
+            summary=mock_summary,
+        )
 
 
 def _generate_forecast_summary(
