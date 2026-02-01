@@ -15,13 +15,13 @@ import { InvestmentCalculator } from "@/components/InvestmentCalculator";
 import { Tooltip } from "@/components/ui/tooltip-custom";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { BarChart3, Home as HomeIcon, User, TrendingUp, Home as Building, List, Map, Calculator, LineChart, Sparkles, Search } from "lucide-react";
+import { BarChart3, Home as HomeIcon, User, TrendingUp, List, Map, Calculator, Sparkles, Search, Leaf } from "lucide-react";
 
 export default function Home() {
   const { state, sendMessage, reset } = useChatStream();
   const { state: propertyState, fetchListings, fetchListingsBoth } = usePropertyListings();
   const [activeTab, setActiveTab] = useState("home");
-  const [sidebarMode, setSidebarMode] = useState<"valuation" | "properties" | "sustainability" | "investment" | "search">("valuation");
+  const [sidebarMode, setSidebarMode] = useState<"valuation" | "properties" | "sustainability" | "investment">("valuation");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [listingFilterType, setListingFilterType] = useState<"all" | "rent" | "sale">("all");
   const [comparedAreas, setComparedAreas] = useState<string[]>([]);
@@ -272,16 +272,6 @@ export default function Home() {
                 <Sparkles className="h-4 w-4" />
               </Button>
             </Tooltip>
-            <Tooltip content="Search & Filter" side="right">
-              <Button
-                variant={sidebarMode === "search" ? "secondary" : "ghost"}
-                size="icon"
-                onClick={() => handleManualSidebarChange("search")}
-                className="w-10 h-10"
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-            </Tooltip>
             <Tooltip content="Property Finder" side="right">
               <Button
                 variant={sidebarMode === "properties" ? "secondary" : "ghost"}
@@ -289,7 +279,7 @@ export default function Home() {
                 onClick={() => handleManualSidebarChange("properties")}
                 className="w-10 h-10"
               >
-                <Building className="h-4 w-4" />
+                <Search className="h-4 w-4" />
               </Button>
             </Tooltip>
             <Tooltip content="Sustainability" side="right">
@@ -299,7 +289,7 @@ export default function Home() {
                 onClick={() => handleManualSidebarChange("sustainability")}
                 className="w-10 h-10"
               >
-                <LineChart className="h-4 w-4" />
+                <Leaf className="h-4 w-4" />
               </Button>
             </Tooltip>
             <Tooltip content="Investment Analysis" side="right">
@@ -383,37 +373,7 @@ export default function Home() {
               </div>
             )}
             
-            {/* Search & Filter Page */}
-            {sidebarMode === "search" && (
-              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
-                <div className="flex-shrink-0 p-4 border-b bg-card/50">
-                  <h2 className="text-lg font-semibold text-foreground">Search & Filter</h2>
-                  <p className="text-xs text-muted-foreground">Find properties by budget and criteria</p>
-                </div>
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                  {/* Budget Filter */}
-                  <BudgetFilter onSearch={handleBudgetSearch} />
-                  
-                  {/* Comparison Tool */}
-                  <ComparisonMode
-                    comparedAreas={comparedAreas}
-                    onAddArea={handleAddCompareArea}
-                    onRemoveArea={handleRemoveCompareArea}
-                  />
-                  
-                  <div className="p-6 bg-card border border-border rounded-lg text-center">
-                    <Search className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-sm font-semibold mb-2">Quick Search Tips</h3>
-                    <ul className="text-xs text-muted-foreground space-y-1 text-left">
-                      <li>• Search by postcode (e.g., "NW1", "E14")</li>
-                      <li>• Filter by budget and bedrooms</li>
-                      <li>• Compare up to 3 areas</li>
-                      <li>• Ask "Show me areas under £2000/month"</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Search & Filter Page removed */}
             
             {/* Property Finder Page */}
             {sidebarMode === "properties" && (

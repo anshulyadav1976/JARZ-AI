@@ -91,7 +91,15 @@ Start-Sleep -Seconds 2
 
 # Start frontend in a new PowerShell window
 Write-Host "Starting frontend server (port 3000)..." -ForegroundColor Yellow
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\frontend'; npm run dev"
+Write-Host "Clearing Next.js cache..." -ForegroundColor Yellow
+try {
+    if (Test-Path "$PSScriptRoot\frontend\.next") {
+        Remove-Item -Recurse -Force "$PSScriptRoot\frontend\.next" -ErrorAction SilentlyContinue
+    }
+} catch {}
+
+# Prefer explicit port to avoid auto-switch
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\frontend'; npx next dev -p 3000"
 
 Write-Host 
 Write-Host "✓ Backend running on http://127.0.0.1:8000" -ForegroundColor Green

@@ -43,6 +43,26 @@ export function usePropertyListings(): UsePropertyListingsResult {
     areaCode: null,
   });
 
+  const fetchAmenitiesForArea = useCallback(async (areaCode: string): Promise<Array<{ type: string; name: string; distance: number }>> => {
+    try {
+      const resp = await fetch(`${API_URL}/api/postcode/${encodeURIComponent(areaCode)}/amenities`);
+      if (!resp.ok) return [];
+      const result = await resp.json();
+      const amenities = Array.isArray(result?.amenities) ? result.amenities : [];
+      // Normalize to our expected shape and limit
+      return amenities
+        .filter((a: any) => a && typeof a.type === "string" && a.name)
+        .slice(0, 6)
+        .map((a: any) => ({
+          type: String(a.type),
+          name: String(a.name),
+          distance: typeof a.distance === "number" ? a.distance : 0,
+        }));
+    } catch {
+      return [];
+    }
+  }, []);
+
   const fetchListings = useCallback(async (areaCode: string, listingType: "rent" | "sale" = "sale") => {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
@@ -89,9 +109,12 @@ export function usePropertyListings(): UsePropertyListingsResult {
             url: "",
           };
         });
+        // Fetch area amenities and attach (area-wide for now)
+        const amenities = await fetchAmenitiesForArea(areaCode);
+        const withAmenities = listings.map(p => ({ ...p, amenities }));
 
         setState({
-          properties: listings,
+          properties: withAmenities,
           isLoading: false,
           error: null,
           areaCode: areaCode,
@@ -154,8 +177,12 @@ export function usePropertyListings(): UsePropertyListingsResult {
         ...normalize(saleData, "sale"),
       ];
 
+      // Fetch area amenities and attach to all listings (area-wide for now)
+      const amenities = await fetchAmenitiesForArea(areaCode);
+      const withAmenities = combined.map(p => ({ ...p, amenities }));
+
       setState({
-        properties: combined,
+        properties: withAmenities,
         isLoading: false,
         error: null,
         areaCode: areaCode,
