@@ -15,6 +15,11 @@ interface Property {
   sqft: number;
   url: string;
   imageUrl?: string;
+  amenities?: Array<{
+    type: string;
+    name: string;
+    distance: number;
+  }>;
 }
 
 interface PropertyListingsState {

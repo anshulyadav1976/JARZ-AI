@@ -26,9 +26,11 @@ export default function Home() {
   const [comparedAreas, setComparedAreas] = useState<string[]>([]);
   const [savedAreas, setSavedAreas] = useState<string[]>([]);
   const [currentArea, setCurrentArea] = useState<string>("");
+  const [autoSwitchEnabled, setAutoSwitchEnabled] = useState(true);
 
   const handleSendMessage = useCallback((message: string) => {
     sendMessage(message);
+    setAutoSwitchEnabled(true); // Re-enable auto-switch when user sends a new message
     
     // Extract area code from message
     const areaCodeMatch = message.match(/\b([A-Z]{1,2}\d{1,2}[A-Z]?)\b/i);
@@ -71,8 +73,37 @@ export default function Home() {
     const bedroomText = bedrooms ? `${bedrooms}-bedroom ` : "";
     sendMessage(`Show me areas where I can rent a ${bedroomText}property for around £${budget} per month`);
   }, [sendMessage]);
+  
+  const handleManualSidebarChange = useCallback((mode: typeof sidebarMode) => {
+    setSidebarMode(mode);
+    setAutoSwitchEnabled(false); // Disable auto-switch when user manually changes tab
+  }, []);
 
   const hasA2UIContent = state.a2uiState.isReady && state.a2uiState.rootId;
+  
+  // Auto-switch to appropriate tab based on tool/content type
+  useEffect(() => {
+    if (hasA2UIContent && state.a2uiState.dataModel && autoSwitchEnabled) {
+      const dataModel = state.a2uiState.dataModel;
+      
+      // Property listings tool → properties tab
+      if (dataModel.listings?.properties) {
+        setSidebarMode("properties");
+      }
+      // Investment analysis tool → investment tab
+      else if (dataModel.investment) {
+        setSidebarMode("investment");
+      }
+      // Rent forecast or other prediction tools → valuation tab
+      else if (dataModel.prediction) {
+        setSidebarMode("valuation");
+      }
+      // Default: valuation tab for any other A2UI content
+      else {
+        setSidebarMode("valuation");
+      }
+    }
+  }, [hasA2UIContent, autoSwitchEnabled, state.a2uiState.dataModel?.prediction, state.a2uiState.dataModel?.listings, state.a2uiState.dataModel?.investment]);
   
   // Extract prediction data for investment calculator
   const getPredictionData = () => {
@@ -90,6 +121,23 @@ export default function Home() {
   };
   
   const predictionData = getPredictionData();
+
+  // Get properties from A2UI data model (sent by agent)
+  const getPropertiesFromDataModel = () => {
+    try {
+      const properties = state.a2uiState.dataModel?.listings?.properties as any[];
+      
+      if (properties && Array.isArray(properties)) {
+        // Properties now have amenities embedded in each property object
+        return properties;
+      }
+    } catch (e) {
+      console.error("Error extracting properties from data model:", e);
+    }
+    return [];
+  };
+
+  const propertiesFromAgent = getPropertiesFromDataModel();
 
   return (
     <main className="h-screen w-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/20 overflow-hidden">
@@ -136,7 +184,7 @@ export default function Home() {
               <Button
                 variant={sidebarMode === "valuation" ? "secondary" : "ghost"}
                 size="icon"
-                onClick={() => setSidebarMode("valuation")}
+                onClick={() => handleManualSidebarChange("valuation")}
                 className="w-10 h-10"
               >
                 <Sparkles className="h-4 w-4" />
@@ -146,7 +194,7 @@ export default function Home() {
               <Button
                 variant={sidebarMode === "search" ? "secondary" : "ghost"}
                 size="icon"
-                onClick={() => setSidebarMode("search")}
+                onClick={() => handleManualSidebarChange("search")}
                 className="w-10 h-10"
               >
                 <Search className="h-4 w-4" />
@@ -156,7 +204,7 @@ export default function Home() {
               <Button
                 variant={sidebarMode === "properties" ? "secondary" : "ghost"}
                 size="icon"
-                onClick={() => setSidebarMode("properties")}
+                onClick={() => handleManualSidebarChange("properties")}
                 className="w-10 h-10"
               >
                 <Building className="h-4 w-4" />
@@ -166,7 +214,7 @@ export default function Home() {
               <Button
                 variant={sidebarMode === "market-trends" ? "secondary" : "ghost"}
                 size="icon"
-                onClick={() => setSidebarMode("market-trends")}
+                onClick={() => handleManualSidebarChange("market-trends")}
                 className="w-10 h-10"
               >
                 <LineChart className="h-4 w-4" />
@@ -176,7 +224,7 @@ export default function Home() {
               <Button
                 variant={sidebarMode === "investment" ? "secondary" : "ghost"}
                 size="icon"
-                onClick={() => setSidebarMode("investment")}
+                onClick={() => handleManualSidebarChange("investment")}
                 className="w-10 h-10"
               >
                 <Calculator className="h-4 w-4" />
@@ -219,9 +267,6 @@ export default function Home() {
                           onAddArea={handleAddCompareArea}
                           onRemoveArea={handleRemoveCompareArea}
                         />
-                        
-                        {/* Budget Filter */}
-                        <BudgetFilter onSearch={handleBudgetSearch} />
                         
                         {/* Main Insights */}
                         <A2UIRenderer state={state.a2uiState} />
@@ -324,8 +369,8 @@ export default function Home() {
                 <div className="flex-1 overflow-y-auto p-4">
                   {viewMode === "list" ? (
                     <PropertyListView 
-                      properties={propertyState.properties}
-                      isLoading={propertyState.isLoading}
+                      properties={propertiesFromAgent.length > 0 ? propertiesFromAgent : propertyState.properties}
+                      isLoading={state.isLoading || propertyState.isLoading}
                       error={propertyState.error}
                     />
                   ) : (
@@ -343,27 +388,20 @@ export default function Home() {
                   <p className="text-xs text-muted-foreground">Historical data and market analysis</p>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6">
-                  {hasA2UIContent ? (
-                    <div className="space-y-6">
-                      <A2UIRenderer state={state.a2uiState} />
-                      <InsightsDisclaimer />
-                    </div>
-                  ) : (
-                    <div className="h-full flex items-center justify-center">
-                      <div className="text-center px-8 py-12 max-w-md">
-                        <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
-                          <LineChart className="w-10 h-10 text-primary" />
-                        </div>
-                        <h3 className="text-lg font-semibold mb-2">Market Trends</h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Ask about a location to see historical trends, forecast timelines, and market patterns.
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Try: "Show me rental trends for NW1"
-                        </p>
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center px-8 py-12 max-w-md">
+                      <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
+                        <LineChart className="w-10 h-10 text-primary" />
                       </div>
+                      <h3 className="text-lg font-semibold mb-2">Market Trends</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Ask about a location to see historical trends, forecast timelines, and market patterns.
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Try: "Show me rental trends for NW1"
+                      </p>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
             )}
@@ -376,7 +414,12 @@ export default function Home() {
                   <p className="text-xs text-muted-foreground">ROI and rental yield calculations</p>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6">
-                  {predictionData ? (
+                  {hasA2UIContent ? (
+                    <div className="space-y-6">
+                      <A2UIRenderer state={state.a2uiState} />
+                      <InsightsDisclaimer />
+                    </div>
+                  ) : predictionData ? (
                     <div className="space-y-6">
                       <InvestmentCalculator 
                         predictedRent={predictionData.p50}

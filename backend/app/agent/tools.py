@@ -11,7 +11,7 @@ from ..schemas import UserQuery, PredictionResult, ExplanationResult, ResolvedLo
 from ..feature_builder import build_features
 from ..model_adapter import get_model_adapter
 from ..explain import explain_prediction
-from ..a2ui_builder import build_complete_ui
+from ..a2ui_builder import build_complete_ui, build_listings_cards
 from ..scansan_client import get_scansan_client
 
 
@@ -50,17 +50,51 @@ class EmbodiedCarbonResult:
     summary: str
 
 
+@dataclass
+class PropertyListingsResult:
+    """Result from property listings search."""
+    success: bool
+    location: str
+    area_code: str
+    rent_listings: list[dict]
+    sale_listings: list[dict]
+    amenities: Optional[dict]
+    a2ui_messages: list[dict]
+    summary: str
+
+
+@dataclass
+class InvestmentAnalysisResult:
+    """Result from investment analysis."""
+    success: bool
+    location: str
+    property_value: float
+    predicted_rent_pcm: float
+    rental_yield: float
+    gross_yield: float
+    net_yield: float
+    monthly_mortgage: float
+    monthly_costs: float
+    monthly_cash_flow: float
+    annual_roi: float
+    break_even_years: float
+    total_investment: float
+    market_metrics: dict
+    a2ui_messages: list[dict]
+    summary: str
+
+
 # Tool definitions for the LLM (OpenAI function calling format)
 TOOL_DEFINITIONS = [
     {
         "name": "get_rent_forecast",
-        "description": "Get a rental price forecast for a specific location in the UK. This tool analyzes the area, considers spatial neighbors, and predicts P10/P50/P90 rent values. Use this when the user asks about rent prices, rental forecasts, property valuations, or wants to know how much rent costs in an area.",
+        "description": "Get rental price prediction and forecast for a UK location. Returns P10/P50/P90 values, market drivers, and visual charts. ALWAYS use this when user asks about: expected rent, rental prices, rent forecast, how much rent costs, what rent should be, rent predictions, rental valuation, or 'how much for a X bedroom in Y'. This is the PRIMARY tool for any rent-related questions.",
         "parameters": {
             "type": "object",
             "properties": {
                 "location": {
                     "type": "string",
-                    "description": "The location to forecast rent for. Can be a UK postcode (e.g., 'NW1', 'E14', 'SW1A'), area name (e.g., 'Camden', 'Canary Wharf'), or district."
+                    "description": "The location to forecast rent for. Can be a UK postcode (e.g., 'NW1', 'E14', 'SW1A 2TL'), area name (e.g., 'Camden', 'Canary Wharf'), or district."
                 },
                 "horizon_months": {
                     "type": "integer",
@@ -79,7 +113,7 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "search_location",
-        "description": "Search for a location to get its area code and basic information. Use this to validate or disambiguate a location before running a forecast.",
+        "description": "ONLY use to resolve ambiguous or unknown locations. Most UK postcodes can be used directly in other tools without searching first.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -130,6 +164,67 @@ TOOL_DEFINITIONS = [
                     "description": "Type of property (flat, house, studio). Optional if UPRN is provided.",
                     "enum": ["flat", "house", "studio"],
                     "default": "flat"
+                }
+            },
+            "required": ["location"]
+        }
+    },
+    {
+        "name": "get_property_listings",
+        "description": "Get property listings (for rent and/or sale) in a specific area along with nearby amenities. Use this when the user asks about available properties, listings, what's for rent/sale, or properties in an area.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The location to search for properties. Can be a UK postcode district (e.g., 'NW1', 'E14') or area name."
+                },
+                "listing_types": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["rent", "sale"]
+                    },
+                    "description": "Types of listings to fetch. Default is both rent and sale.",
+                    "default": ["rent", "sale"]
+                },
+                "include_amenities": {
+                    "type": "boolean",
+                    "description": "Whether to include nearby amenities. Default is true.",
+                    "default": True
+                }
+            },
+            "required": ["location"]
+        }
+    },
+    {
+        "name": "get_investment_analysis",
+        "description": "Calculate comprehensive investment analysis including ROI, rental yield, cash flow projections, and market metrics. Use when user asks about investment potential, ROI, returns, rental yield, or buying a property.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "location": {
+                    "type": "string",
+                    "description": "The location to analyze. Can be a UK postcode or area name."
+                },
+                "property_value": {
+                    "type": "number",
+                    "description": "The purchase price of the property in GBP. Optional - if not provided, will use market average."
+                },
+                "deposit_percent": {
+                    "type": "number",
+                    "description": "Deposit percentage (default 25%).",
+                    "default": 25
+                },
+                "mortgage_rate": {
+                    "type": "number",
+                    "description": "Annual mortgage interest rate percentage (default 4.5%).",
+                    "default": 4.5
+                },
+                "mortgage_years": {
+                    "type": "number",
+                    "description": "Mortgage term in years (default 25).",
+                    "default": 25
                 }
             },
             "required": ["location"]
@@ -228,9 +323,8 @@ def _generate_forecast_summary(
         driver_text = f" Key factors: {', '.join(driver_parts)}."
     
     summary = (
-        f"For {area_name}, the {horizon_months}-month rental forecast shows: "
-        f"P50 (median) rent of {prediction.p50:,.0f} {prediction.unit}, "
-        f"with a confidence band from {prediction.p10:,.0f} (P10) to {prediction.p90:,.0f} (P90) {prediction.unit}."
+        f"{area_name} {horizon_months}mo forecast: "
+        f"£{prediction.p50:,.0f} (P10: £{prediction.p10:,.0f}, P90: £{prediction.p90:,.0f})"
         f"{driver_text}"
     )
     
@@ -497,6 +591,139 @@ async def execute_get_embodied_carbon(
         )
 
 
+async def execute_get_property_listings(
+    location: str,
+    listing_types: list[str] = None,
+    include_amenities: bool = True,
+) -> PropertyListingsResult:
+    """
+    Execute the property listings tool.
+    
+    Fetches rent and/or sale listings for an area and optionally includes
+    nearby amenities information.
+    
+    Args:
+        location: Location string (postcode district or area name)
+        listing_types: List of listing types to fetch ("rent" and/or "sale")
+        include_amenities: Whether to fetch nearby amenities
+        
+    Returns:
+        PropertyListingsResult with listings and amenities data
+    """
+    from ..a2ui_builder import build_listings_cards
+    
+    if listing_types is None:
+        listing_types = ["rent", "sale"]
+    
+    client = get_scansan_client()
+    
+    try:
+        # Resolve location to area code
+        resolved_location = await client.search_area_codes(location)
+        
+        if not resolved_location:
+            raise ValueError(f"Could not find location: {location}")
+        
+        area_code = resolved_location.area_code_district or resolved_location.area_code
+        
+        # Fetch listings
+        rent_listings = []
+        sale_listings = []
+        
+        if "rent" in listing_types:
+            print(f"[LISTINGS] Fetching rent listings for {area_code}")
+            rent_data = await client.get_rent_listings(area_code)
+            if rent_data and "data" in rent_data:
+                rent_listings = rent_data["data"].get("rent_listings", [])
+                print(f"[LISTINGS] Found {len(rent_listings)} rent listings")
+        
+        if "sale" in listing_types:
+            print(f"[LISTINGS] Fetching sale listings for {area_code}")
+            sale_data = await client.get_sale_listings(area_code)
+            if sale_data and "data" in sale_data:
+                sale_listings = sale_data["data"].get("sale_listings", [])
+                print(f"[LISTINGS] Found {len(sale_listings)} sale listings")
+        
+        # Fetch amenities per property if requested
+        amenities_by_postcode = {}
+        if include_amenities:
+            # Collect unique postcodes from all listings
+            unique_postcodes = set()
+            for listing in rent_listings:
+                postcode = listing.get("area_code")
+                if postcode:
+                    unique_postcodes.add(postcode)
+            for listing in sale_listings:
+                postcode = listing.get("area_code")
+                if postcode:
+                    unique_postcodes.add(postcode)
+            
+            # Fetch amenities for each unique postcode (limit to first 5 to avoid too many requests)
+            for postcode in list(unique_postcodes)[:5]:
+                print(f"[LISTINGS] Fetching amenities for {postcode}")
+                try:
+                    amenities_data = await client.get_amenities(postcode)
+                    if amenities_data and "data" in amenities_data:
+                        # Process amenities into simple list
+                        amenities_list = []
+                        for amenity_group in amenities_data["data"]:
+                            if isinstance(amenity_group, list):
+                                for amenity in amenity_group:
+                                    amenities_list.append({
+                                        "type": amenity.get("amenity_type", "Unknown"),
+                                        "name": amenity.get("name", "Unknown"),
+                                        "distance": amenity.get("distance_miles", 0),
+                                    })
+                        amenities_by_postcode[postcode] = amenities_list[:10]  # Limit to 10 amenities per property
+                        print(f"[LISTINGS] Found {len(amenities_list)} amenities for {postcode}")
+                except Exception as e:
+                    print(f"[LISTINGS] Error fetching amenities for {postcode}: {str(e)}")
+        
+        # Build A2UI messages (cards for listings)
+        a2ui_messages = build_listings_cards(
+            rent_listings=rent_listings,
+            sale_listings=sale_listings,
+            amenities_by_postcode=amenities_by_postcode,
+            location=resolved_location.display_name or area_code,
+        )
+        
+        # Generate summary
+        total_listings = len(rent_listings) + len(sale_listings)
+        summary_parts = []
+        
+        if rent_listings:
+            summary_parts.append(f"{len(rent_listings)} properties for rent")
+        if sale_listings:
+            summary_parts.append(f"{len(sale_listings)} properties for sale")
+        
+        summary = f"{resolved_location.display_name or area_code}: "
+        summary += " and ".join(summary_parts)
+        
+        return PropertyListingsResult(
+            success=True,
+            location=resolved_location.display_name or area_code,
+            area_code=area_code,
+            rent_listings=rent_listings,
+            sale_listings=sale_listings,
+            amenities=list(amenities_by_postcode.values())[0] if amenities_by_postcode else None,  # For backward compatibility
+            a2ui_messages=a2ui_messages,
+            summary=summary,
+        )
+        
+    except Exception as e:
+        print(f"[LISTINGS] Error: {str(e)}")
+        return PropertyListingsResult(
+            success=False,
+            location=location,
+            area_code="",
+            rent_listings=[],
+            sale_listings=[],
+            amenities=None,
+            a2ui_messages=[],
+            summary=f"Error fetching property listings for {location}: {str(e)}",
+        )
+
+
 async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """
     Execute a tool by name with given arguments.
@@ -557,6 +784,51 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             "property_size": result.property_size,
             "property_type": result.property_type,
             "recommendations": result.recommendations,
+            "a2ui_messages": result.a2ui_messages,
+            "summary": result.summary,
+        }
+    
+    elif tool_name == "get_property_listings":
+        result = await execute_get_property_listings(
+            location=arguments["location"],
+            listing_types=arguments.get("listing_types", ["rent", "sale"]),
+            include_amenities=arguments.get("include_amenities", True),
+        )
+        return {
+            "success": result.success,
+            "location": result.location,
+            "area_code": result.area_code,
+            "rent_listings": result.rent_listings,
+            "sale_listings": result.sale_listings,
+            "amenities": result.amenities,
+            "a2ui_messages": result.a2ui_messages,
+            "summary": result.summary,
+        }
+    
+    elif tool_name == "get_investment_analysis":
+        from .investment import execute_get_investment_analysis
+        result = await execute_get_investment_analysis(
+            location=arguments["location"],
+            property_value=arguments.get("property_value"),
+            deposit_percent=arguments.get("deposit_percent", 25),
+            mortgage_rate=arguments.get("mortgage_rate", 4.5),
+            mortgage_years=arguments.get("mortgage_years", 25),
+        )
+        return {
+            "success": result.success,
+            "location": result.location,
+            "property_value": result.property_value,
+            "predicted_rent_pcm": result.predicted_rent_pcm,
+            "rental_yield": result.rental_yield,
+            "gross_yield": result.gross_yield,
+            "net_yield": result.net_yield,
+            "monthly_mortgage": result.monthly_mortgage,
+            "monthly_costs": result.monthly_costs,
+            "monthly_cash_flow": result.monthly_cash_flow,
+            "annual_roi": result.annual_roi,
+            "break_even_years": result.break_even_years,
+            "total_investment": result.total_investment,
+            "market_metrics": result.market_metrics,
             "a2ui_messages": result.a2ui_messages,
             "summary": result.summary,
         }

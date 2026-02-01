@@ -206,27 +206,53 @@ from ..llm_client import get_llm_client, ChatMessage as LLMChatMessage, ToolDefi
 
 
 # System prompt for the chat agent
-SYSTEM_PROMPT = """You are JARZ, an expert AI assistant for UK rental property valuation. You help users understand rental prices, market trends, and property valuations across the UK.
+SYSTEM_PROMPT = """You are RentRadar, a UK property AI assistant. You help users with rental forecasts, property listings, and investment analysis.
 
-Your capabilities:
-1. **Rental Forecasting**: Predict future rental prices with confidence intervals (P10/P50/P90)
-2. **Location Analysis**: Search and validate UK postcodes and areas
-3. **Market Insights**: Explain factors driving rental prices using data-driven analysis
+TOOL SELECTION RULES (follow strictly):
 
-When users ask about rental prices, valuations, or forecasts:
-- Use the get_rent_forecast tool to generate predictions
-- Always explain what the numbers mean in plain language
-- Highlight key drivers affecting the prediction
+1. Rent/Price Questions → get_rent_forecast
+   - "What's the rent in X?"
+   - "How much to rent in Y?"
+   - "Expected rent for..."
+   
+2. Property Listings → get_property_listings
+   - "What's for rent/sale in X?"
+   - "Show me properties in Y"
+   - "Find listings in Z"
+   
+3. Investment/ROI Questions → get_investment_analysis
+   - "What's my ROI if I buy..."
+   - "Should I invest in..."
+   - "Is X a good investment?"
+   - "Rental yield for..."
 
-When answering questions:
-- Be concise but informative
-- Use specific numbers and data when available
-- Explain complex concepts in simple terms
-- If you're unsure about a location, use search_location first
+4. Location Search → search_location (RARELY NEEDED)
+   - Only if location is completely ambiguous
+   - Most UK postcodes work directly
 
-For UK postcodes, common formats include: NW1, E14, SW1A, EC2A, W1, SE1, etc.
+CRITICAL: After ANY tool call, you MUST provide a natural, conversational summary. Users see detailed visualizations - your job is to tell the story in plain English.
 
-You render visualizations automatically when running forecasts - the user will see charts, maps, and driver analysis alongside your text response."""
+Response format:
+- Write naturally - NO structured headers like "Bottom line:", "Details:", etc.
+- Break into 2-3 short paragraphs for readability
+- Use ranges instead of exact figures ("7-8%" not "7.83%")
+- Be helpful and encouraging
+- Add practical advice or offer next steps naturally
+- 4-6 sentences typical (longer is fine if adding value)
+
+Example responses:
+"You're looking at around £2,400 per month for Camden, typically between £2,000-£2,800 depending on the property.
+
+The market here is quite strong with good demand from professionals. I'd recommend viewing properties quickly as they tend to go fast in this area."
+
+"I found around 45 rental properties in Shoreditch, with most priced between £1,500-£3,200 per month. There's a good mix of studios and 1-2 bedroom apartments available.
+
+The lower end tends to be further from the tube stations, while premium properties near Old Street command higher rents. Let me know if you'd like me to filter by specific criteria like bedrooms or price range."
+
+"A £300k property in UB8 would give you around 8% gross yield with positive monthly cash flow of about £300 per month. That's a solid investment with good returns, especially compared to most London areas which typically offer 4-5% yields.
+
+The area has decent rental demand from Heathrow workers and local professionals, which helps with occupancy. Overall, this looks like a promising buy-to-let opportunity."
+"""
 
 
 def _convert_messages_for_llm(messages: list[ChatMessage]) -> list[LLMChatMessage]:
@@ -280,6 +306,16 @@ async def chat_node(state: ChatAgentState) -> dict[str, Any]:
     try:
         messages = state.get("messages", [])
         
+        print(f"[CHAT_NODE] Processing {len(messages)} messages")
+        
+        # Debug: Print last few messages to see what LLM is getting
+        if len(messages) > 1:
+            for i, msg in enumerate(messages[-3:]):
+                role = msg.get("role")
+                content = msg.get("content", "")
+                content_preview = content[:100] if content else "[no content]"
+                print(f"[CHAT_NODE] Message {i}: role={role}, content_len={len(content or '')}, preview={content_preview}")
+        
         # Add system prompt if not present
         if not messages or messages[0].get("role") != "system":
             system_msg: ChatMessage = {
@@ -292,6 +328,8 @@ async def chat_node(state: ChatAgentState) -> dict[str, Any]:
         llm_messages = _convert_messages_for_llm(messages)
         tools = _get_tool_definitions()
         
+        print(f"[CHAT_NODE] Calling LLM with {len(tools)} tools")
+        
         # Call LLM
         client = get_llm_client()
         response = await client.chat_completion(
@@ -300,6 +338,8 @@ async def chat_node(state: ChatAgentState) -> dict[str, Any]:
             temperature=0.7,
             max_tokens=2048,
         )
+        
+        print(f"[CHAT_NODE] LLM response - tool_calls: {bool(response.tool_calls)}, content length: {len(response.content or '')}")
         
         # Check if we have tool calls
         if response.tool_calls:
@@ -370,6 +410,8 @@ async def tool_executor_node(state: ChatAgentState) -> dict[str, Any]:
         stream_output = list(state.get("stream_output", []))
         current_valuation = state.get("current_valuation")
         
+        print(f"[TOOL_EXECUTOR] Executing {len(pending_calls)} tool calls")
+        
         if not pending_calls:
             return {
                 "status": "no_tools",
@@ -393,7 +435,8 @@ async def tool_executor_node(state: ChatAgentState) -> dict[str, Any]:
             
             # Collect A2UI messages if present
             if result.get("a2ui_messages"):
-                a2ui_messages = result["a2ui_messages"]
+                # Extend the list instead of replacing it
+                a2ui_messages.extend(result["a2ui_messages"])
                 stream_output.append({
                     "type": "a2ui",
                     "messages": result["a2ui_messages"],
@@ -408,10 +451,18 @@ async def tool_executor_node(state: ChatAgentState) -> dict[str, Any]:
                     "neighbors": result.get("neighbors"),
                 }
             
-            # Add tool result to messages
+            # Add tool result to messages - ONLY send summary to LLM, not full data
+            # This prevents context window overflow with large datasets
+            llm_result = {
+                "summary": result.get("summary", "Tool executed successfully"),
+                "success": result.get("success", True),
+            }
+            
+            print(f"[TOOL_EXECUTOR] Sending summary to LLM: {llm_result['summary'][:200]}...")
+            
             tool_result_msg: ChatMessage = {
                 "role": "tool",
-                "content": json.dumps(result, default=str),
+                "content": json.dumps(llm_result),
                 "tool_call_id": tool_call["id"],
                 "name": tool_name,
             }
@@ -422,6 +473,8 @@ async def tool_executor_node(state: ChatAgentState) -> dict[str, Any]:
                 "tool": tool_name,
                 "success": result.get("success", True),
             })
+        
+        print(f"[TOOL_EXECUTOR] Completed {len(pending_calls)} tools, returning with should_continue=True")
         
         return {
             "messages": messages,
