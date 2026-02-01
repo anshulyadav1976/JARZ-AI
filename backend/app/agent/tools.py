@@ -769,25 +769,22 @@ async def execute_get_embodied_carbon(
             embodied_carbon_a4=a4_transport / 1000,
             embodied_carbon_a5=a5_construction / 1000,
         )
+        print(f"[CARBON] Received {len(a2ui_messages)} messages from build_carbon_card")
+        for i, msg in enumerate(a2ui_messages):
+            print(f"[CARBON]   Message {i}: {list(msg.keys())}")
         
-        # Generate summary
+        # Generate summary (balanced length ~130 words)
         reduction_percent = ((current_emissions - potential_emissions) / current_emissions) * 100 if current_emissions > 0 else 0
-        cost_reduction_percent = ((total_current_cost - total_potential_cost) / total_current_cost) * 100 if total_current_cost > 0 else 0
         total_annual_carbon = current_emissions + embodied_carbon_annual_tonnes
         
         summary = (
-            f"Sustainability Assessment for {property_address} ({property_size:.0f} m² {property_type}):\n\n"
-            f"🌱 **Energy Performance:** EPC {energy_rating} (Score: {energy_score}/100) → Potential: {potential_rating} ({potential_score}/100)\n"
-            f"🌍 **Environmental Impact Score:** {env_current_score}/100 → Potential: {env_potential_score}/100\n\n"
-            f"⚡ **Energy Consumption:** {current_consumption} {consumption_metric} → {potential_consumption} {consumption_metric} ({consumption_savings:.0f} {consumption_metric} reduction)\n"
-            f"💰 **Annual Energy Costs:** {currency}{total_current_cost:.0f} → {currency}{total_potential_cost:.0f} (Save {currency}{cost_savings:.0f}/year, {cost_reduction_percent:.0f}% reduction)\n"
-            f"🏭 **CO2 Emissions (Operational):** {current_emissions:.1f} tonnes/year → {potential_emissions:.1f} tonnes/year ({reduction_percent:.0f}% reduction)\n\n"
-            f"🏗️ **Embodied Carbon (EN 15978):**\n"
-            f"   • Total (A1-A5): {embodied_carbon_total_tonnes:.1f} tonnes CO₂e\n"
-            f"   • Intensity: {embodied_carbon_per_m2:.0f} kg CO₂e/m² (GIA)\n"
-            f"   • Annualized (60 yrs): {embodied_carbon_annual_tonnes:.2f} tonnes/year\n"
-            f"   • Total Annual Footprint: {total_annual_carbon:.2f} tonnes CO₂e/year\n\n"
-            f"✨ **Key Features:** {', '.join(efficiency_features[:3]) if efficiency_features else 'Standard efficiency'}"
+            f"This {property_size:.0f}m² {property_type} has an EPC rating of {energy_rating} (score {energy_score}/100) with current operational emissions "
+            f"of {current_emissions:.1f} tonnes CO₂ per year. Through energy efficiency improvements, emissions could be reduced by {reduction_percent:.0f}% "
+            f"to {potential_emissions:.1f} tonnes/year, achieving a potential {potential_rating} rating. "
+            f"The property's embodied carbon footprint totals {embodied_carbon_total_tonnes:.1f} tonnes CO₂e from construction materials and processes, "
+            f"which translates to approximately {embodied_carbon_annual_tonnes:.2f} tonnes/year when amortized over a 60-year lifespan. "
+            f"Combined with operational emissions, the total annual carbon footprint is {total_annual_carbon:.2f} tonnes CO₂e/year. "
+            f"See the Sustainability tab for detailed breakdowns, energy costs, and improvement recommendations."
         )
         
         return EmbodiedCarbonResult(

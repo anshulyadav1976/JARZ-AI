@@ -267,10 +267,16 @@ async def generate_chat_sse_events(
             
             elif event_type == "a2ui":
                 # Stream each A2UI message individually
-                for a2ui_msg in event.get("messages", []):
+                messages_list = event.get("messages", [])
+                print(f"\n[SSE] Streaming {len(messages_list)} A2UI messages")
+                for i, a2ui_msg in enumerate(messages_list):
+                    msg_keys = list(a2ui_msg.keys())
+                    print(f"[SSE]   Message {i}: {msg_keys}")
+                    serialized = json.dumps(a2ui_msg)
+                    print(f"[SSE]   Serialized length: {len(serialized)} chars")
                     yield {
                         "event": "a2ui",
-                        "data": json.dumps(a2ui_msg),
+                        "data": serialized,
                     }
             
             elif event_type == "error":

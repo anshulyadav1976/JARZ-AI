@@ -5,7 +5,7 @@ import { useChatStream } from "@/hooks/useChatStream";
 import { usePropertyListings } from "@/hooks/usePropertyListings";
 import { ChatPanel } from "@/components/ChatPanel";
 import { A2UIRenderer } from "@/components/A2UIRenderer";
-import { PropertyFinderView } from "@/components/PropertyListView";
+import { PropertyListView } from "@/components/PropertyListView";
 import { PropertyMapView } from "@/components/PropertyMapView";
 import { InsightsActions } from "@/components/InsightsActions";
 import { InsightsDisclaimer } from "@/components/InsightsDisclaimer";
@@ -38,8 +38,8 @@ export default function Home() {
       const areaCode = areaCodeMatch[1].toUpperCase();
       setCurrentArea(areaCode);
       
-      // If in buying-selling mode, fetch listings
-      if (sidebarMode === "buying-selling") {
+      // If in properties mode, fetch listings
+      if (sidebarMode === "properties") {
         fetchListings(areaCode, "sale");
       }
     }
@@ -80,10 +80,16 @@ export default function Home() {
   }, []);
 
   const hasA2UIContent = state.a2uiState.isReady && state.a2uiState.rootId;
+  console.log("[PAGE] hasA2UIContent:", hasA2UIContent, "isReady:", state.a2uiState.isReady, "rootId:", state.a2uiState.rootId);
   
   // Helper function to filter A2UI state by data model path
   const filterA2UIByPath = useCallback((path: string) => {
-    if (!state.a2uiState.dataModel) return state.a2uiState;
+    console.log("[filterA2UIByPath] Called with path:", path);
+    console.log("[filterA2UIByPath] Full data model:", state.a2uiState.dataModel);
+    if (!state.a2uiState.dataModel) {
+      console.log("[filterA2UIByPath] No data model, returning empty state");
+      return state.a2uiState;
+    }
     
     const dataModel = state.a2uiState.dataModel as any;
     const pathData = path.split('/').filter(Boolean).reduce(
@@ -91,7 +97,12 @@ export default function Home() {
       dataModel
     );
     
-    if (!pathData) return { ...state.a2uiState, isReady: false };
+    console.log("[filterA2UIByPath] Path data for", path, ":", pathData);
+    
+    if (!pathData) {
+      console.log("[filterA2UIByPath] No data at path, returning not ready");
+      return { ...state.a2uiState, isReady: false };
+    }
     
     // Create filtered data model with only this path
     const filteredDataModel: any = {};
@@ -103,6 +114,8 @@ export default function Home() {
       current = current[keys[i]];
     }
     current[keys[keys.length - 1]] = pathData;
+    
+    console.log("[filterA2UIByPath] Returning filtered data model:", filteredDataModel);
     
     return {
       ...state.a2uiState,
@@ -154,8 +167,9 @@ export default function Home() {
   const getPredictionData = () => {
     if (!hasA2UIContent) return null;
     try {
-      const p50 = state.a2uiState.dataModel?.prediction?.p50 as number;
-      const location = state.a2uiState.dataModel?.location as string;
+      const dataModel = state.a2uiState.dataModel as any;
+      const p50 = dataModel?.prediction?.p50 as number;
+      const location = dataModel?.location as string;
       if (p50 && location) {
         return { p50, location };
       }
@@ -170,7 +184,8 @@ export default function Home() {
   // Get properties from A2UI data model (sent by agent)
   const getPropertiesFromDataModel = () => {
     try {
-      const properties = state.a2uiState.dataModel?.listings?.properties as any[];
+      const dataModel = state.a2uiState.dataModel as any;
+      const properties = dataModel?.listings?.properties as any[];
       
       if (properties && Array.isArray(properties)) {
         // Properties now have amenities embedded in each property object
@@ -299,7 +314,7 @@ export default function Home() {
                   <>
                     {/* Action Buttons Header */}
                     <InsightsActions 
-                      isSaved={currentArea && savedAreas.includes(currentArea)}
+                      isSaved={currentArea !== "" && savedAreas.includes(currentArea)}
                       onToggleSave={currentArea ? handleToggleSave : undefined}
                     />
                     

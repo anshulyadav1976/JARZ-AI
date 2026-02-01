@@ -342,10 +342,20 @@ function RenderComponent({
 }
 
 export function A2UIRenderer({ state, onWhatIfChange }: A2UIRendererProps) {
+  console.log("[A2UIRenderer] State:", {
+    isReady: state.isReady,
+    rootId: state.rootId,
+    componentsCount: state.components.size,
+    dataModelKeys: Object.keys(state.dataModel),
+  });
+  
   if (!state.isReady || !state.rootId) {
+    console.log("[A2UIRenderer] Not ready or no rootId, returning null");
     return null;
   }
 
+  console.log("[A2UIRenderer] Rendering component:", state.rootId);
+  
   return (
     <div className="w-full">
       <RenderComponent

@@ -329,6 +329,10 @@ async def chat_node(state: ChatAgentState) -> dict[str, Any]:
         tools = _get_tool_definitions()
         
         print(f"[CHAT_NODE] Calling LLM with {len(tools)} tools")
+        print(f"[CHAT_NODE] Sending {len(llm_messages)} messages to LLM:")
+        for i, llm_msg in enumerate(llm_messages):
+            msg_dict = llm_msg.to_dict()
+            print(f"[CHAT_NODE]   Message {i}: {msg_dict.get('role')} - {msg_dict.get('content', '')[:100]}")
         
         # Call LLM
         client = get_llm_client()
@@ -340,6 +344,8 @@ async def chat_node(state: ChatAgentState) -> dict[str, Any]:
         )
         
         print(f"[CHAT_NODE] LLM response - tool_calls: {bool(response.tool_calls)}, content length: {len(response.content or '')}")
+        if response.content:
+            print(f"[CHAT_NODE] LLM content preview: {response.content[:200]}")
         
         # Check if we have tool calls
         if response.tool_calls:
@@ -433,14 +439,24 @@ async def tool_executor_node(state: ChatAgentState) -> dict[str, Any]:
             # Execute the tool
             result = await execute_tool(tool_name, tool_args)
             
+            print(f"\n[TOOL_EXECUTOR] Tool {tool_name} result keys: {list(result.keys())}")
+            print(f"[TOOL_EXECUTOR] Has a2ui_messages: {bool(result.get('a2ui_messages'))}")
+            if result.get("a2ui_messages"):
+                print(f"[TOOL_EXECUTOR] Number of A2UI messages: {len(result['a2ui_messages'])}")
+                for i, msg in enumerate(result['a2ui_messages']):
+                    print(f"[TOOL_EXECUTOR]   A2UI message {i}: {list(msg.keys())}")
+            
             # Collect A2UI messages if present
             if result.get("a2ui_messages"):
                 # Extend the list instead of replacing it
                 a2ui_messages.extend(result["a2ui_messages"])
-                stream_output.append({
+                stream_obj = {
                     "type": "a2ui",
                     "messages": result["a2ui_messages"],
-                })
+                }
+                print(f"[TOOL_EXECUTOR] Adding stream object to stream_output: type={stream_obj['type']}, messages count={len(stream_obj['messages'])}")
+                stream_output.append(stream_obj)
+                print(f"[TOOL_EXECUTOR] stream_output now has {len(stream_output)} items")
             
             # Store valuation if present
             if result.get("prediction"):

@@ -157,8 +157,15 @@ class LLMClient:
         response.raise_for_status()
         data = response.json()
         
+        print(f"[LLM_CLIENT] API response: {json.dumps(data, indent=2)[:500]}")
+        
         choice = data["choices"][0]
         message = choice["message"]
+        finish_reason = choice.get("finish_reason")
+        
+        print(f"[LLM_CLIENT] Finish reason: {finish_reason}")
+        print(f"[LLM_CLIENT] Message content: {message.get('content')}")
+        print(f"[LLM_CLIENT] Message tool_calls: {message.get('tool_calls')}")
         
         # Parse tool calls if present
         tool_calls = None
