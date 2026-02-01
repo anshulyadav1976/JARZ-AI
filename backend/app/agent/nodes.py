@@ -230,6 +230,18 @@ TOOL SELECTION RULES (follow strictly):
    - Only if location is completely ambiguous
    - Most UK postcodes work directly
 
+5. Location comparisons → compare_areas
+   - "Compare NW1 vs E14"
+   - "Which is better: Camden or Shoreditch?"
+   - "Compare these areas: NW1, E14, SW1A"
+
+6. Market Data (growth, demand, valuations, sale history) → get_market_data
+   - "Give me market data on NW1"
+   - "Show me market data for postcode SW1A 2AA"
+   - "Load market data for Camden"
+   - "I want growth, rent demand and sale history for E14"
+   - Opens the Market Data tab and loads growth, rent/sale demand (district), valuations and sale history (full postcode).
+
 CRITICAL: After ANY tool call, you MUST provide a natural, conversational summary. Users see detailed visualizations - your job is to tell the story in plain English.
 
 Response format:
@@ -340,7 +352,7 @@ async def chat_node(state: ChatAgentState) -> dict[str, Any]:
             messages=llm_messages,
             tools=tools,
             temperature=0.7,
-            max_tokens=2048,
+            max_tokens=200_000,
         )
         
         print(f"[CHAT_NODE] LLM response - tool_calls: {bool(response.tool_calls)}, content length: {len(response.content or '')}")
@@ -463,6 +475,14 @@ async def tool_executor_node(state: ChatAgentState) -> dict[str, Any]:
                 print(f"[TOOL_EXECUTOR] Adding stream object to stream_output: type={stream_obj['type']}, messages count={len(stream_obj['messages'])}")
                 stream_output.append(stream_obj)
                 print(f"[TOOL_EXECUTOR] stream_output now has {len(stream_output)} items")
+
+            # Emit market_data_request so frontend switches to Market Data tab and loads
+            if result.get("market_data_request"):
+                stream_output.append({
+                    "type": "market_data_request",
+                    "district": result["market_data_request"].get("district"),
+                    "postcode": result["market_data_request"].get("postcode"),
+                })
             
             # Store valuation if present
             if result.get("prediction"):

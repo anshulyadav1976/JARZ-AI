@@ -10,6 +10,9 @@ import { DriversBar } from "./DriversBar";
 import { WhatIfControls } from "./WhatIfControls";
 import { CarbonCard } from "./CarbonCard";
 import { InvestmentCalculator } from "./InvestmentCalculator";
+import { LocationComparisonSummaryCard } from "./LocationComparisonSummaryCard";
+import { LocationComparisonRanges } from "./LocationComparisonRanges";
+import { LocationComparisonListings } from "./LocationComparisonListings";
 
 interface A2UIRendererProps {
   state: StreamState;
@@ -31,6 +34,9 @@ const COMPONENT_REGISTRY: Record<
   DriversBar: DriversBarWrapper,
   WhatIfControls: WhatIfControlsWrapper,
   CarbonCard: CarbonCardWrapper,
+  LocationComparisonSummaryCard: LocationComparisonSummaryCardWrapper,
+  LocationComparisonRanges: LocationComparisonRangesWrapper,
+  LocationComparisonListings: LocationComparisonListingsWrapper,
 };
 
 // Wrapper components to handle A2UI props
@@ -186,6 +192,57 @@ function WhatIfControlsWrapper({
       compareMode={false}
     />
   );
+}
+
+function LocationComparisonSummaryCardWrapper({
+  props,
+  dataModel,
+}: {
+  props: Record<string, unknown>;
+  dataModel: Record<string, unknown>;
+}) {
+  const areasPath = (props.areasPath as Record<string, unknown>)?.path as string;
+  const winnersPath = (props.winnersPath as Record<string, unknown>)?.path as string;
+
+  const areas =
+    areasPath ? (resolveBoundValue({ path: areasPath }, dataModel) as any[]) || [] : [];
+  const winners =
+    winnersPath ? (resolveBoundValue({ path: winnersPath }, dataModel) as Record<string, unknown>) || {} : {};
+
+  return (
+    <LocationComparisonSummaryCard
+      areas={areas as any}
+      winners={winners as any}
+    />
+  );
+}
+
+function LocationComparisonRangesWrapper({
+  props,
+  dataModel,
+}: {
+  props: Record<string, unknown>;
+  dataModel: Record<string, unknown>;
+}) {
+  const areasPath = (props.areasPath as Record<string, unknown>)?.path as string;
+  const areas =
+    areasPath ? (resolveBoundValue({ path: areasPath }, dataModel) as any[]) || [] : [];
+
+  return <LocationComparisonRanges areas={areas as any} />;
+}
+
+function LocationComparisonListingsWrapper({
+  props,
+  dataModel,
+}: {
+  props: Record<string, unknown>;
+  dataModel: Record<string, unknown>;
+}) {
+  const areasPath = (props.areasPath as Record<string, unknown>)?.path as string;
+  const areas =
+    areasPath ? (resolveBoundValue({ path: areasPath }, dataModel) as any[]) || [] : [];
+
+  return <LocationComparisonListings areas={areas as any} />;
 }
 
 function CarbonCardWrapper({

@@ -276,14 +276,17 @@ class ScanSanClient:
         self,
         district: str,
         period: Optional[str] = None,
+        additional_data: bool = False,
     ) -> Optional[dict]:
-        """Get demand data for district."""
+        """Get rental demand data for district."""
         params = {}
         if period:
             params["period"] = period
-        
+        if additional_data:
+            params["additional_data"] = additional_data
+
         print(f"[SCANSAN] GET /v1/district/{district}/rent/demand")
-        data = await self._request("GET", f"/v1/district/{district}/rent/demand", params)
+        data = await self._request("GET", f"/v1/district/{district}/rent/demand", params or None)
         
         if data and "data" in data:
             print(f"[SCANSAN] Demand data found for {district}")

@@ -100,12 +100,12 @@ export function DriversBar({ drivers, base_value }: DriversBarProps) {
       </div>
 
       {/* Summary */}
-      <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="mt-6 pt-4 border-t border-border">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-sm text-muted-foreground">
             Net Impact
           </span>
-          <span className="font-bold text-lg text-gray-900 dark:text-white">
+          <span className="font-bold text-lg text-foreground tabular-nums">
             {formatValue(
               drivers.reduce(
                 (sum, d) =>
