@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -30,11 +30,12 @@ interface PropertyFinderViewProps {
   properties?: PropertyFinderProperty[];
   isLoading?: boolean;
   error?: string | null;
+  forcedFilterType?: "all" | "rent" | "sale";
 }
 
-export function PropertyListView({ properties = [], isLoading = false, error = null }: PropertyListViewProps) {
+export function PropertyListView({ properties = [], isLoading = false, error = null, forcedFilterType }: PropertyListViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "rent" | "sale">("all");
+  const [filterType, setFilterType] = useState<"all" | "rent" | "sale">(forcedFilterType ?? "all");
   const [minBeds, setMinBeds] = useState<number>(0);
   const [maxPrice, setMaxPrice] = useState<number>(0);
 
@@ -83,6 +84,11 @@ export function PropertyListView({ properties = [], isLoading = false, error = n
       return true;
     });
   }, [properties, searchQuery, filterType, minBeds, maxPrice]);
+
+  // Sync external forced filter type when the page requests a change
+  useEffect(() => {
+    if (forcedFilterType) setFilterType(forcedFilterType);
+  }, [forcedFilterType]);
 
   const getAmenityIcon = (type: string) => {
     const lowerType = type.toLowerCase();
