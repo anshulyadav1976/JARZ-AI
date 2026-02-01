@@ -14,22 +14,30 @@ The implementation is compliant with:
 - **RICS Whole Life Carbon Assessment** (2nd Edition, 2023)
 - **ICE Database v3.0** - Inventory of Carbon & Energy (University of Bath)
 
+### Reference Resources
+
+For detailed explanation of EN 15978 lifecycle stages:
+- [Whole Life Carbon Assessment - System Boundaries (A1-A5)](https://www.wholelifecarbon.com/page/whole-life-carbon-assessment)
+- [BetterBuilding System Boundaries Guide](https://docs.betterbuilding.io/user-guide/workflows/carbon/carbon-faqs/system-boundaries-en-15978)
+- [One Click LCA - Life Cycle Stages](https://help.oneclicklca.com/en/articles/275901-life-cycle-stages)
+- [London Plan - Whole Life Carbon Assessments Guidance](https://www.london.gov.uk/publications/whole-life-cycle-carbon-assessments-guidance)
+
 ## Scope: Product & Construction Stages (A1-A5)
 
-The calculation covers the following lifecycle stages per EN 15978:
+The calculation covers the following lifecycle stages per EN 15978 ([reference](https://www.wholelifecarbon.com/page/whole-life-carbon-assessment)):
 
 ### A1-A3: Product Stage (Cradle-to-Gate)
 - **A1**: Raw material extraction and processing
 - **A2**: Transport to manufacturing facility
 - **A3**: Manufacturing of construction products
 
-These stages are bundled in Environmental Product Declarations (EPDs) and represent the embodied carbon of materials as delivered to site.
+These stages are bundled in Environmental Product Declarations (EPDs) and represent the embodied carbon of materials as delivered to gate ([reference](https://docs.betterbuilding.io/user-guide/workflows/carbon/carbon-faqs/system-boundaries-en-15978)).
 
 ### A4: Transport to Site
-Transport of materials and products from manufacturing gate to construction site.
+Transport of materials and products from manufacturing gate to construction site ([reference](https://help.oneclicklca.com/en/articles/275901-life-cycle-stages)).
 
 ### A5: Construction/Installation Process
-On-site construction activities including equipment use, waste processing, and energy consumption during construction.
+On-site construction activities including equipment use, waste processing, and energy consumption during construction ([reference](https://www.london.gov.uk/publications/whole-life-cycle-carbon-assessments-guidance)).
 
 ## Methodology
 
@@ -208,13 +216,28 @@ Where:
 
 ## Data Sources & References
 
+### Standards & Frameworks
 1. **EN 15978:2011** - Sustainability of construction works - Assessment of environmental performance of buildings - Calculation method
 2. **EN 15804:2012+A2:2019** - Sustainability of construction works - Environmental product declarations - Core rules
 3. **ISO 14040:2006** - Environmental management - Life cycle assessment - Principles and framework
 4. **ISO 14044:2006** - Environmental management - Life cycle assessment - Requirements and guidelines
 5. **RICS Whole Life Carbon Assessment for the Built Environment** (2nd Edition, 2023)
+
+### Emission Factors & Data
 6. **ICE Database v3.0** - Inventory of Carbon & Energy, Circular Ecology/University of Bath (2019)
+   - Used for: Material emission factors (concrete, steel, brick, timber)
 7. **UK Government GHG Conversion Factors** - DEFRA (2024)
+   - Used for: Transport emission factors (0.1 kg CO₂e/t·km)
+
+### Implementation Guidance
+8. **Whole Life Carbon Assessment - System Boundaries** - https://www.wholelifecarbon.com/page/whole-life-carbon-assessment
+   - Used for: A1-A5 lifecycle stage definitions and methodology
+9. **BetterBuilding EN 15978 System Boundaries Guide** - https://docs.betterbuilding.io/user-guide/workflows/carbon/carbon-faqs/system-boundaries-en-15978
+   - Used for: Stage-by-stage calculation approach
+10. **One Click LCA - Life Cycle Stages** - https://help.oneclicklca.com/en/articles/275901-life-cycle-stages
+    - Used for: Transport (A4) and construction process (A5) methodology
+11. **London Plan - Whole Life Carbon Assessments Guidance** - https://www.london.gov.uk/publications/whole-life-cycle-carbon-assessments-guidance
+    - Used for: UK-specific compliance requirements and construction process factors
 
 ## Implementation Details
 
