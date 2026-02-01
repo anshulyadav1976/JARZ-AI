@@ -27,8 +27,15 @@ interface ConversationSummary {
 }
 
 export default function Home() {
-  const { state, sendMessage, reset } = useChatStream();
-  const { state: propertyState, fetchListings } = usePropertyListings();
+  const [marketTrigger, setMarketTrigger] = useState<{ district?: string | null; postcode?: string | null } | null>(null);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const { state, sendMessage, reset, loadConversation, applyA2UIMessages } = useChatStream({
+    onMarketDataRequest: (data) => {
+      setSidebarMode("market");
+      setMarketTrigger({ district: data.district ?? null, postcode: data.postcode ?? null });
+    },
+  });
+  const { state: propertyState, fetchListings, fetchListingsBoth } = usePropertyListings();
   const [activeTab, setActiveTab] = useState("home");
   const [sidebarMode, setSidebarMode] = useState<"valuation" | "comparison" | "properties" | "sustainability" | "investment" | "market">("valuation");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
@@ -305,8 +312,47 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden w-full min-h-0">
-        {/* Sidebar - only show after user sends first message */}
+      <div className="flex-1 flex overflow-hidden w-full min-w-0 min-h-0">
+        {/* Chat history sidebar: New chat + past conversations */}
+        <div className="w-52 flex-shrink-0 border-r bg-muted/30 flex flex-col overflow-hidden">
+          <div className="p-2 border-b flex-shrink-0">
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full gap-2"
+              onClick={handleNewChat}
+            >
+              <MessageSquarePlus className="h-4 w-4" />
+              New chat
+            </Button>
+          </div>
+          <div className="flex-1 overflow-y-auto py-2">
+            {conversations.length === 0 ? (
+              <p className="text-muted-foreground text-xs px-3 py-2">No past chats yet</p>
+            ) : (
+              <ul className="space-y-0.5 px-2">
+                {conversations.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadConversation(c.id)}
+                      className={`w-full text-left rounded-lg px-3 py-2 text-sm truncate transition-colors ${
+                        state.conversationId === c.id
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-muted"
+                      }`}
+                      title={c.title || "Chat"}
+                    >
+                      {c.title || "Chat"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        {/* Icon sidebar - only show after user sends first message */}
         {state.messages.length > 0 && (
           <div className="w-14 flex-shrink-0 border-r bg-card/50 flex flex-col items-center justify-start py-3 gap-1.5">
             <Tooltip content="Valuation & Insights" side="right">
@@ -370,6 +416,7 @@ export default function Home() {
               </Button>
             </Tooltip>
           </div>
+        )}
 
         {/* Chat Panel */}
         <div className={`flex-shrink min-w-0 border-r transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "w-full md:w-[45%] lg:w-[38%]" : "w-full"}`}>
