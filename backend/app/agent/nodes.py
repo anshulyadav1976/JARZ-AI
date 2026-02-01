@@ -436,8 +436,14 @@ async def tool_executor_node(state: ChatAgentState) -> dict[str, Any]:
                 "arguments": tool_args,
             })
             
-            # Execute the tool
-            result = await execute_tool(tool_name, tool_args)
+            # Execute the tool (NEVER crash the graph; always emit a tool message)
+            try:
+                result = await execute_tool(tool_name, tool_args)
+            except Exception as e:
+                result = {
+                    "success": False,
+                    "summary": f"{tool_name} failed: {str(e)}",
+                }
             
             print(f"\n[TOOL_EXECUTOR] Tool {tool_name} result keys: {list(result.keys())}")
             print(f"[TOOL_EXECUTOR] Has a2ui_messages: {bool(result.get('a2ui_messages'))}")

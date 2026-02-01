@@ -30,10 +30,10 @@ async def build_temporal_features(
     features = {
         "month": now.month,
         "quarter": (now.month - 1) // 3 + 1,
-        "rent_growth_mom": growth_data.get("mom_growth", 0.0),
-        "rent_growth_yoy": growth_data.get("yoy_growth", 0.0),
-        "demand_index": demand_data.get("demand_index", 75.0),
-        "demand_index_lag1": demand_data.get("demand_index", 75.0) * 0.98,  # Simulated lag
+        "rent_growth_mom": (growth_data or {}).get("mom_growth", 0.0),
+        "rent_growth_yoy": (growth_data or {}).get("yoy_growth", 0.0),
+        "demand_index": (demand_data or {}).get("demand_index", 75.0),
+        "demand_index_lag1": (demand_data or {}).get("demand_index", 75.0) * 0.98,  # Simulated lag
         "horizon_months": horizon_months,
     }
     
@@ -126,9 +126,9 @@ async def build_features(query: UserQuery) -> tuple[ModelFeatures, ResolvedLocat
         neighbor_avg_growth=spatial_features["neighbor_avg_growth"],
         neighbor_count=spatial_features["neighbor_count"],
         # Area stats
-        median_rent=summary.get("median_rent"),
-        avg_rent=summary.get("avg_rent"),
-        listing_count=summary.get("listing_count"),
+        median_rent=(summary or {}).get("median_rent"),
+        avg_rent=(summary or {}).get("avg_rent"),
+        listing_count=(summary or {}).get("listing_count"),
     )
     
     return features, location, neighbors
