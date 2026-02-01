@@ -219,6 +219,8 @@ export function useChatStream(): UseChatStreamResult {
           let buffer = "";
           let accumulatedContent = "";
           let hasReceivedA2UI = false;
+          // IMPORTANT: keep currentEvent across chunks; event/data lines can arrive in different reads
+          let currentEvent = "";
 
           while (true) {
             const { done, value } = await reader.read();
@@ -262,16 +264,27 @@ export function useChatStream(): UseChatStreamResult {
             // Parse SSE events
             const lines = buffer.split("\n");
             buffer = lines.pop() || "";
-
-            let currentEvent = "";
             for (const line of lines) {
-              if (line.startsWith("event: ")) {
-                currentEvent = line.slice(7).trim();
+              // Normalize CRLF and blank separators
+              const normalized = line.trimEnd();
+              if (normalized.trim() === "") {
+                // Blank line indicates end of one SSE event block
+                currentEvent = "";
                 continue;
               }
 
-              if (line.startsWith("data: ")) {
-                const jsonStr = line.slice(6).trim();
+              // Comment/keepalive line (e.g. ": ping - ...")
+              if (normalized.startsWith(":")) {
+                continue;
+              }
+
+              if (normalized.startsWith("event: ")) {
+                currentEvent = normalized.slice(7).trim();
+                continue;
+              }
+
+              if (normalized.startsWith("data: ")) {
+                const jsonStr = normalized.slice(6).trim();
                 try {
                   const data = JSON.parse(jsonStr);
 
@@ -318,8 +331,6 @@ export function useChatStream(): UseChatStreamResult {
                     // Status update - can add visual feedback here if needed
                     console.log("Agent status:", data);
                   }
-
-                  currentEvent = "";
                 } catch (e) {
                   console.error("Failed to parse SSE data:", e, "Line:", jsonStr);
                 }
