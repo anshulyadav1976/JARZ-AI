@@ -21,7 +21,7 @@ export default function Home() {
   const { state, sendMessage, reset } = useChatStream();
   const { state: propertyState, fetchListings } = usePropertyListings();
   const [activeTab, setActiveTab] = useState("home");
-  const [sidebarMode, setSidebarMode] = useState<"valuation" | "properties" | "market-trends" | "investment" | "search">("valuation");
+  const [sidebarMode, setSidebarMode] = useState<"valuation" | "properties" | "sustainability" | "investment" | "search">("valuation");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [comparedAreas, setComparedAreas] = useState<string[]>([]);
   const [savedAreas, setSavedAreas] = useState<string[]>([]);
@@ -81,29 +81,74 @@ export default function Home() {
 
   const hasA2UIContent = state.a2uiState.isReady && state.a2uiState.rootId;
   
+  // Helper function to filter A2UI state by data model path
+  const filterA2UIByPath = useCallback((path: string) => {
+    if (!state.a2uiState.dataModel) return state.a2uiState;
+    
+    const dataModel = state.a2uiState.dataModel as any;
+    const pathData = path.split('/').filter(Boolean).reduce(
+      (obj, key) => obj?.[key],
+      dataModel
+    );
+    
+    if (!pathData) return { ...state.a2uiState, isReady: false };
+    
+    // Create filtered data model with only this path
+    const filteredDataModel: any = {};
+    const keys = path.split('/').filter(Boolean);
+    let current = filteredDataModel;
+    
+    for (let i = 0; i < keys.length - 1; i++) {
+      current[keys[i]] = {};
+      current = current[keys[i]];
+    }
+    current[keys[keys.length - 1]] = pathData;
+    
+    return {
+      ...state.a2uiState,
+      dataModel: filteredDataModel,
+    };
+  }, [state.a2uiState]);
+  
   // Auto-switch to appropriate tab based on tool/content type
   useEffect(() => {
     if (hasA2UIContent && state.a2uiState.dataModel && autoSwitchEnabled) {
-      const dataModel = state.a2uiState.dataModel;
+      const dataModel = state.a2uiState.dataModel as any;
+      
+      console.log("[AUTO-SWITCH] Data model:", dataModel);
+      console.log("[AUTO-SWITCH] Has listings:", !!dataModel.listings);
+      console.log("[AUTO-SWITCH] Has properties:", !!dataModel.listings?.properties);
+      console.log("[AUTO-SWITCH] Has investment:", !!dataModel.investment);
+      console.log("[AUTO-SWITCH] Has prediction:", !!dataModel.prediction);
+      console.log("[AUTO-SWITCH] Has carbon:", !!dataModel.carbon);
       
       // Property listings tool → properties tab
       if (dataModel.listings?.properties) {
+        console.log("[AUTO-SWITCH] Switching to properties tab");
         setSidebarMode("properties");
       }
       // Investment analysis tool → investment tab
       else if (dataModel.investment) {
+        console.log("[AUTO-SWITCH] Switching to investment tab");
         setSidebarMode("investment");
+      }
+      // Carbon/sustainability tool → sustainability tab
+      else if (dataModel.carbon) {
+        console.log("[AUTO-SWITCH] Switching to sustainability tab");
+        setSidebarMode("sustainability");
       }
       // Rent forecast or other prediction tools → valuation tab
       else if (dataModel.prediction) {
+        console.log("[AUTO-SWITCH] Switching to valuation tab");
         setSidebarMode("valuation");
       }
       // Default: valuation tab for any other A2UI content
       else {
+        console.log("[AUTO-SWITCH] Defaulting to valuation tab");
         setSidebarMode("valuation");
       }
     }
-  }, [hasA2UIContent, autoSwitchEnabled, state.a2uiState.dataModel?.prediction, state.a2uiState.dataModel?.listings, state.a2uiState.dataModel?.investment]);
+  }, [hasA2UIContent, autoSwitchEnabled, state.a2uiState.dataModel]);
   
   // Extract prediction data for investment calculator
   const getPredictionData = () => {
@@ -210,11 +255,11 @@ export default function Home() {
                 <Building className="h-4 w-4" />
               </Button>
             </Tooltip>
-            <Tooltip content="Market Trends" side="right">
+            <Tooltip content="Sustainability" side="right">
               <Button
-                variant={sidebarMode === "market-trends" ? "secondary" : "ghost"}
+                variant={sidebarMode === "sustainability" ? "secondary" : "ghost"}
                 size="icon"
-                onClick={() => handleManualSidebarChange("market-trends")}
+                onClick={() => handleManualSidebarChange("sustainability")}
                 className="w-10 h-10"
               >
                 <LineChart className="h-4 w-4" />
@@ -249,7 +294,7 @@ export default function Home() {
           <div className={`flex-1 overflow-hidden transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "block" : "hidden md:block"}`}>
             {/* Valuation & AI Insights */}
             {sidebarMode === "valuation" && (
-              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-blue-50 via-background to-indigo-50 dark:from-blue-950/20 dark:via-background dark:to-indigo-950/20">
                 {hasA2UIContent ? (
                   <>
                     {/* Action Buttons Header */}
@@ -269,7 +314,9 @@ export default function Home() {
                         />
                         
                         {/* Main Insights */}
-                        <A2UIRenderer state={state.a2uiState} />
+                        <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-1 border-2 border-blue-200 dark:border-blue-800/50 shadow-lg">
+                          <A2UIRenderer state={filterA2UIByPath('prediction')} />
+                        </div>
                         
                         {/* Investment Calculator (if we have prediction data) */}
                         {predictionData && (
@@ -287,8 +334,8 @@ export default function Home() {
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     <div className="text-center px-8 py-12 max-w-md">
-                      <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
-                        <BarChart3 className="w-10 h-10 text-primary" />
+                      <div className="w-20 h-20 mx-auto mb-6 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                        <BarChart3 className="w-10 h-10 text-blue-600 dark:text-blue-400" />
                       </div>
                       <h3 className="text-lg font-semibold mb-2">Insights Panel</h3>
                       <p className="text-sm text-muted-foreground">
@@ -380,43 +427,68 @@ export default function Home() {
               </div>
             )}
             
-            {/* Market Trends Page */}
-            {sidebarMode === "market-trends" && (
-              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
-                <div className="flex-shrink-0 p-4 border-b bg-card/50">
-                  <h2 className="text-lg font-semibold text-foreground">Market Trends</h2>
-                  <p className="text-xs text-muted-foreground">Historical data and market analysis</p>
-                </div>
-                <div className="flex-1 overflow-y-auto p-6">
-                  <div className="h-full flex items-center justify-center">
-                    <div className="text-center px-8 py-12 max-w-md">
-                      <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
-                        <LineChart className="w-10 h-10 text-primary" />
-                      </div>
-                      <h3 className="text-lg font-semibold mb-2">Market Trends</h3>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        Ask about a location to see historical trends, forecast timelines, and market patterns.
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Try: "Show me rental trends for NW1"
-                      </p>
+            {/* Sustainability Assessment Page */}
+            {sidebarMode === "sustainability" && (
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-violet-50 via-background to-purple-50 dark:from-violet-950/20 dark:via-background dark:to-purple-950/20">
+                <div className="flex-shrink-0 p-4 border-b-2 border-violet-200 dark:border-violet-800 bg-violet-50/50 dark:bg-violet-950/30">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
+                      <LineChart className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-foreground">Sustainability Assessment</h2>
+                      <p className="text-xs text-muted-foreground">Carbon emissions and energy efficiency analysis</p>
                     </div>
                   </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6">
+                  {hasA2UIContent ? (
+                    <div className="space-y-6">
+                      <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-4 border-2 border-violet-200 dark:border-violet-800/50 shadow-lg">
+                        <A2UIRenderer state={filterA2UIByPath('carbon')} />
+                      </div>
+                      <InsightsDisclaimer />
+                    </div>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <div className="text-center px-8 py-12 max-w-md">
+                        <div className="w-20 h-20 mx-auto mb-6 bg-violet-100 dark:bg-violet-900/30 rounded-full flex items-center justify-center">
+                          <LineChart className="w-10 h-10 text-violet-600 dark:text-violet-400" />
+                        </div>
+                        <h3 className="text-lg font-semibold mb-2">Sustainability Assessment</h3>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          Ask about a property's carbon footprint, energy efficiency, and environmental impact.
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Try: "What is the carbon footprint of UB10 0GH?"
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
             
             {/* Investment Analysis Page */}
             {sidebarMode === "investment" && (
-              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
-                <div className="flex-shrink-0 p-4 border-b bg-card/50">
-                  <h2 className="text-lg font-semibold text-foreground">Investment Analysis</h2>
-                  <p className="text-xs text-muted-foreground">ROI and rental yield calculations</p>
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-emerald-50 via-background to-green-50 dark:from-emerald-950/20 dark:via-background dark:to-green-950/20">
+                <div className="flex-shrink-0 p-4 border-b-2 border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
+                      <Calculator className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-foreground">Investment Analysis</h2>
+                      <p className="text-xs text-muted-foreground">ROI, yields, and cash flow projections</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6">
                   {hasA2UIContent ? (
                     <div className="space-y-6">
-                      <A2UIRenderer state={state.a2uiState} />
+                      <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-4 border-2 border-emerald-200 dark:border-emerald-800/50 shadow-lg">
+                        <A2UIRenderer state={filterA2UIByPath('investment')} />
+                      </div>
                       <InsightsDisclaimer />
                     </div>
                   ) : predictionData ? (
@@ -440,8 +512,8 @@ export default function Home() {
                   ) : (
                     <div className="h-full flex items-center justify-center">
                       <div className="text-center px-8 py-12 max-w-md">
-                        <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
-                          <Calculator className="w-10 h-10 text-primary" />
+                        <div className="w-20 h-20 mx-auto mb-6 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
+                          <Calculator className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <h3 className="text-lg font-semibold mb-2">Investment Calculator</h3>
                         <p className="text-sm text-muted-foreground mb-4">
