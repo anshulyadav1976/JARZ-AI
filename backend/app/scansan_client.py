@@ -274,9 +274,11 @@ class ScanSanClient:
         print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/addresses")
         data = await self._request("GET", f"/v1/postcode/{clean_postcode}/addresses")
         
-        if data and "data" in data and len(data["data"]) > 0:
-            print(f"[SCANSAN] Found {len(data['data'])} addresses")
-            return data
+        if data and "data" in data:
+            property_addresses = data["data"].get("property_address", [])
+            if len(property_addresses) > 0:
+                print(f"[SCANSAN] Found {len(property_addresses)} addresses")
+                return data
         
         print(f"[SCANSAN] No addresses found for {postcode}")
         return None
@@ -316,11 +318,15 @@ class ScanSanClient:
         print(f"[SCANSAN] Looking up UPRN for postcode: {postcode}")
         addresses_data = await self.get_postcode_addresses(postcode)
         
-        if addresses_data and "data" in addresses_data and len(addresses_data["data"]) > 0:
-            # Return first address UPRN
-            uprn = str(addresses_data["data"][0].get("uprn"))
-            print(f"[SCANSAN] Using first address UPRN: {uprn}")
-            return uprn
+        if addresses_data and "data" in addresses_data:
+            property_addresses = addresses_data["data"].get("property_address", [])
+            if len(property_addresses) > 0:
+                # Return first address UPRN
+                uprn = str(property_addresses[0].get("uprn"))
+                address = property_addresses[0].get("property_address", postcode)
+                print(f"[SCANSAN] Using first address: {address}")
+                print(f"[SCANSAN] UPRN: {uprn}")
+                return uprn
         
         print(f"[SCANSAN] No UPRN found for postcode: {postcode}")
         return None

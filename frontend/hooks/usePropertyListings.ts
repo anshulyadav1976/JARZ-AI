@@ -23,7 +23,7 @@ interface Property {
 }
 
 interface PropertyListingsState {
-  properties: Property[];
+  properties: PropertyFinderProperty[];
   isLoading: boolean;
   error: string | null;
   areaCode: string | null;

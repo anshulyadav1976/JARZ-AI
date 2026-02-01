@@ -111,36 +111,48 @@ def load_data() -> Tuple[pd.DataFrame, pd.DataFrame]:
 
 
 # ============ FEATURE ENGINEERING ============
-def add_spatial_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Add K-nearest neighbor spatial features."""
+def add_spatial_features(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+    """Add K-nearest neighbor spatial features and return neighbor details."""
     print("Adding spatial features...")
     df = df.copy()
     df["lat"] = df["district"].map(lambda x: DISTRICT_COORDS.get(x, (None, None))[0])
     df["lon"] = df["district"].map(lambda x: DISTRICT_COORDS.get(x, (None, None))[1])
-    
+
     has_coords = df["lat"].notna()
+    neighbor_details = {}
     if has_coords.sum() < 5:
         df["region"] = df["district"].str.extract(r'^([A-Z]+)', expand=False)
         for col in ["rent_demand_mean_pcm", "rent_avg_pcm", "growth_latest_avg_price"]:
             if col in df.columns:
                 df[f"spatial_{col}_region_avg"] = df.groupby("region")[col].transform("mean")
-        return df
-    
+        return df, neighbor_details
+
     coords = df.loc[has_coords, ["lat", "lon"]].values
+    districts = df.loc[has_coords, "district"].values
     if len(coords) > 1:
         dist_matrix = cdist(coords, coords, metric="euclidean")
         K = min(5, len(coords) - 1)
-        
+
         for i, idx in enumerate(df.loc[has_coords].index):
             nearest_idx = np.argsort(dist_matrix[i])[1:K+1]
+            neighbor_list = []
+            for nidx in nearest_idx:
+                neighbor_row = df.loc[has_coords].iloc[nidx]
+                neighbor_list.append({
+                    "district": neighbor_row["district"],
+                    "distance": float(dist_matrix[i, nidx]),
+                    **{col: neighbor_row[col] for col in df.columns if col not in ["lat", "lon"]}
+                })
+            neighbor_details[df.loc[idx, "district"]] = neighbor_list
+            # For backward compatibility, keep the avg features
             for col in ["rent_demand_mean_pcm", "rent_avg_pcm", "growth_latest_avg_price"]:
                 if col in df.columns:
                     vals = df.loc[has_coords].iloc[nearest_idx][col].dropna()
                     if len(vals) > 0:
                         df.loc[idx, f"spatial_{col}_neighbor_avg"] = vals.mean()
-    
+
     print(f"  Added spatial features for {has_coords.sum()} districts")
-    return df
+    return df, neighbor_details
 
 
 def add_temporal_features(df: pd.DataFrame, df_ts: pd.DataFrame) -> pd.DataFrame:
@@ -395,7 +407,7 @@ if __name__ == "__main__":
     
     # Load and prepare data
     df, df_ts = load_data()
-    df = add_spatial_features(df)
+    df, neighbor_details = add_spatial_features(df)
     df = add_temporal_features(df, df_ts)
     
     # Find target column
@@ -414,6 +426,7 @@ if __name__ == "__main__":
     y = df[target_col]
     
     artifact = train_quantile_model(X, y)
+    artifact["neighbors"] = neighbor_details
     metrics = evaluate_model(artifact, X, y)
     shap_imp = compute_shap(artifact, X)
     save_model(artifact, metrics, shap_imp)

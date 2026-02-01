@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { ExternalLink, MapPin, Bed, Bath, Square, Loader2, School, Hospital, Train, ShoppingCart, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface Property {
+interface PropertyFinderProperty {
   id: string;
   title: string;
   price: number;
@@ -25,8 +25,8 @@ interface Property {
   }>;
 }
 
-interface PropertyListViewProps {
-  properties?: Property[];
+interface PropertyFinderViewProps {
+  properties?: PropertyFinderProperty[];
   isLoading?: boolean;
   error?: string | null;
 }
@@ -237,8 +237,22 @@ export function PropertyListView({ properties = [], isLoading = false, error = n
                 </Badge>
               </div>
             </div>
-            <div className="text-right">
+            <div className="flex items-center justify-between mt-2">
               <div className="font-bold text-lg">{formatPrice(property.price, property.type)}</div>
+              <a
+                href={property.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                View Listing
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
+            {/* Placeholder for reviews */}
+            <div className="mt-2 text-xs text-muted-foreground">
+              <span>Reviews: </span>
+              <span className="italic">(No reviews yet)</span>
             </div>
           </div>
 

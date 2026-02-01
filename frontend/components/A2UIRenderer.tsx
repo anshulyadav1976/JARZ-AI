@@ -200,13 +200,24 @@ function CarbonCardWrapper({
   const potentialEmissions = resolveBoundValue(props.potentialEmissions as Record<string, unknown>, dataModel) as number;
   const emissionsMetric = resolveBoundValue(props.emissionsMetric as Record<string, unknown>, dataModel) as string;
   const energyRating = resolveBoundValue(props.energyRating as Record<string, unknown>, dataModel) as string;
+  const potentialRating = resolveBoundValue(props.potentialRating as Record<string, unknown>, dataModel) as string;
   const propertySize = resolveBoundValue(props.propertySize as Record<string, unknown>, dataModel) as number;
   const propertyType = resolveBoundValue(props.propertyType as Record<string, unknown>, dataModel) as string;
-  const reductionPercent = resolveBoundValue(props.reductionPercent as Record<string, unknown>, dataModel) as number;
-  
-  // Get recommendations from data model
-  const recommendationsPath = "/carbon/recommendations";
-  const recommendations = resolveBoundValue({ path: recommendationsPath }, dataModel) as Array<Record<string, unknown>> || [];
+  const currentConsumption = resolveBoundValue(props.currentConsumption as Record<string, unknown>, dataModel) as number;
+  const potentialConsumption = resolveBoundValue(props.potentialConsumption as Record<string, unknown>, dataModel) as number;
+  const consumptionMetric = resolveBoundValue(props.consumptionMetric as Record<string, unknown>, dataModel) as string;
+  const currentEnergyCost = resolveBoundValue(props.currentEnergyCost as Record<string, unknown>, dataModel) as number;
+  const potentialEnergyCost = resolveBoundValue(props.potentialEnergyCost as Record<string, unknown>, dataModel) as number;
+  const currency = resolveBoundValue(props.currency as Record<string, unknown>, dataModel) as string;
+  const environmentalScore = resolveBoundValue(props.environmentalScore as Record<string, unknown>, dataModel) as number;
+  const potentialEnvironmentalScore = resolveBoundValue(props.potentialEnvironmentalScore as Record<string, unknown>, dataModel) as number;
+  const efficiencyFeatures = resolveBoundValue(props.efficiencyFeatures as Record<string, unknown>, dataModel) as string;
+  const embodiedCarbonTotal = resolveBoundValue(props.embodiedCarbonTotal as Record<string, unknown>, dataModel) as number;
+  const embodiedCarbonPerM2 = resolveBoundValue(props.embodiedCarbonPerM2 as Record<string, unknown>, dataModel) as number;
+  const embodiedCarbonAnnual = resolveBoundValue(props.embodiedCarbonAnnual as Record<string, unknown>, dataModel) as number;
+  const embodiedCarbonA1A3 = resolveBoundValue(props.embodiedCarbonA1A3 as Record<string, unknown>, dataModel) as number;
+  const embodiedCarbonA4 = resolveBoundValue(props.embodiedCarbonA4 as Record<string, unknown>, dataModel) as number;
+  const embodiedCarbonA5 = resolveBoundValue(props.embodiedCarbonA5 as Record<string, unknown>, dataModel) as number;
 
   return (
     <CarbonCard
@@ -215,14 +226,24 @@ function CarbonCardWrapper({
       potentialEmissions={potentialEmissions || 0}
       emissionsMetric={emissionsMetric || "tonnes CO2/year"}
       energyRating={energyRating || "C"}
+      potentialRating={potentialRating || "B"}
       propertySize={propertySize || 0}
       propertyType={propertyType || "flat"}
-      reductionPercent={reductionPercent || 0}
-      recommendations={recommendations.map((r) => ({
-        recommendation: r.recommendation as string,
-        potential_reduction: r.potential_reduction as number,
-        cost_estimate: r.cost_estimate as string,
-      }))}
+      currentConsumption={currentConsumption || 0}
+      potentialConsumption={potentialConsumption || 0}
+      consumptionMetric={consumptionMetric || "kWh/m2"}
+      currentEnergyCost={currentEnergyCost || 0}
+      potentialEnergyCost={potentialEnergyCost || 0}
+      currency={currency || "£"}
+      environmentalScore={environmentalScore || 0}
+      potentialEnvironmentalScore={potentialEnvironmentalScore || 0}
+      efficiencyFeatures={efficiencyFeatures || "Standard efficiency"}
+      embodiedCarbonTotal={embodiedCarbonTotal || 0}
+      embodiedCarbonPerM2={embodiedCarbonPerM2 || 0}
+      embodiedCarbonAnnual={embodiedCarbonAnnual || 0}
+      embodiedCarbonA1A3={embodiedCarbonA1A3 || 0}
+      embodiedCarbonA4={embodiedCarbonA4 || 0}
+      embodiedCarbonA5={embodiedCarbonA5 || 0}
     />
   );
 }
@@ -321,10 +342,20 @@ function RenderComponent({
 }
 
 export function A2UIRenderer({ state, onWhatIfChange }: A2UIRendererProps) {
+  console.log("[A2UIRenderer] State:", {
+    isReady: state.isReady,
+    rootId: state.rootId,
+    componentsCount: state.components.size,
+    dataModelKeys: Object.keys(state.dataModel),
+  });
+  
   if (!state.isReady || !state.rootId) {
+    console.log("[A2UIRenderer] Not ready or no rootId, returning null");
     return null;
   }
 
+  console.log("[A2UIRenderer] Rendering component:", state.rootId);
+  
   return (
     <div className="w-full">
       <RenderComponent

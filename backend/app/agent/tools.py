@@ -398,13 +398,14 @@ async def execute_get_embodied_carbon(
     and calculates embodied carbon emissions.
     
     Args:
-        location: Location string (postcode or UPRN)
+        location: Location string (postcode with optional house number, or UPRN)
         property_type: Type of property (flat, house, studio)
         
     Returns:
         EmbodiedCarbonResult with carbon data and UI components
     """
     from ..a2ui_builder import build_carbon_card
+    import re
     
     client = get_scansan_client()
     
@@ -417,24 +418,76 @@ async def execute_get_embodied_carbon(
         if location.replace(" ", "").isdigit():
             # It's a UPRN
             uprn = location
-            print(f"\n[CARBON] Fetching energy performance for UPRN: {uprn}")
-            energy_data = await client.get_property_energy_performance(uprn)
+            print(f"\n[CARBON] Using provided UPRN: {uprn}")
         else:
-            # It's a postcode - try direct postcode endpoint first (simpler)
-            print(f"\n[CARBON] Fetching energy performance for postcode: {location}")
-            energy_data = await client.get_postcode_energy_performance(location)
+            # It's a postcode - get all addresses and match house number if provided
+            print(f"\n[CARBON] Parsing location: {location}")
             
-            # If that fails, try the UPRN lookup method
-            if not energy_data:
-                print(f"[CARBON] Direct postcode lookup failed, trying UPRN lookup...")
-                uprn = await client.get_uprn_from_postcode(location)
-                print(f"[CARBON] Found UPRN: {uprn}")
+            # Extract house number from location string (e.g., "6 UB10 0GH" or "6, NICHOLSON WALK, UB10 0GH")
+            house_number_match = re.search(r'^(\d+[\w]?)', location.strip())
+            house_number = house_number_match.group(1) if house_number_match else None
+            
+            # Extract postcode (UK postcode format)
+            postcode_match = re.search(r'([A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2})', location.upper())
+            postcode = postcode_match.group(1) if postcode_match else location
+            
+            print(f"[CARBON] Extracted house number: {house_number}")
+            print(f"[CARBON] Extracted postcode: {postcode}")
+            
+            # Get all addresses for this postcode
+            addresses_data = await client.get_postcode_addresses(postcode)
+            
+            if not addresses_data or "data" not in addresses_data:
+                raise ValueError(f"Could not find any properties for postcode: {postcode}")
+            
+            property_addresses = addresses_data["data"].get("property_address", [])
+            
+            if len(property_addresses) == 0:
+                raise ValueError(f"No properties found for postcode: {postcode}")
+            
+            print(f"[CARBON] Found {len(property_addresses)} properties in {postcode}")
+            
+            # If house number provided, find matching property
+            if house_number:
+                print(f"[CARBON] Searching for house number: {house_number}")
+                matched_property = None
                 
-                if uprn:
-                    print(f"[CARBON] Fetching energy performance for UPRN: {uprn}")
-                    energy_data = await client.get_property_energy_performance(uprn)
+                for prop in property_addresses:
+                    prop_address = prop.get("property_address", "")
+                    # Check if address starts with the house number
+                    if prop_address.strip().startswith(house_number):
+                        matched_property = prop
+                        print(f"[CARBON] Matched property: {prop_address}")
+                        break
+                
+                if matched_property:
+                    uprn = str(matched_property.get("uprn"))
+                    property_address = matched_property.get("property_address", location)
                 else:
-                    raise ValueError(f"Could not find UPRN for postcode: {location}")
+                    # House number not found - list available properties
+                    available = "\n".join([f"  - {p.get('property_address', 'Unknown')}" for p in property_addresses[:10]])
+                    raise ValueError(
+                        f"Could not find property number '{house_number}' in {postcode}.\n\n"
+                        f"Available properties:\n{available}\n\n"
+                        f"Please specify the exact house number from the list above."
+                    )
+            else:
+                # No house number provided - list all and ask user to specify
+                available = "\n".join([f"  - {p.get('property_address', 'Unknown')}" for p in property_addresses[:10]])
+                raise ValueError(
+                    f"Multiple properties found in {postcode}. Please specify which property:\n\n"
+                    f"{available}\n\n"
+                    f"Example: 'What's the carbon footprint for 6 {postcode}?'"
+                )
+            
+            print(f"[CARBON] Using UPRN: {uprn} for {property_address}")
+        
+        # Store the matched address before API call
+        matched_address = property_address if 'property_address' in locals() else None
+        
+        # Now fetch energy performance data using the UPRN
+        print(f"[CARBON] Fetching energy performance for UPRN: {uprn}")
+        energy_data = await client.get_property_energy_performance(uprn)
         
         # Debug: Print what we got from the API
         print(f"\n[CARBON] Energy Performance Data Response:")
@@ -452,51 +505,78 @@ async def execute_get_embodied_carbon(
         
         if "annual_CO2_emissions" in energy_data:
             # Real ScanSan data
-            property_address = energy_data.get("property_address", location)
-            property_size = energy_data.get("property_size", 75)
+            # Use matched address if we have it, otherwise use API address
+            property_address = matched_address or energy_data.get("property_address", location)
+            property_size = energy_data.get("property_size",0.0)
             property_size_metric = energy_data.get("property_size_metric", "sqm")
             
             epc_data = energy_data.get("EPC", {})
             energy_rating = epc_data.get("current_rating", "C")
+            potential_rating = epc_data.get("potential_rating", "B")
+            energy_score = epc_data.get("current_score", 0)
+            potential_score = epc_data.get("potential_score", 0)
             
             co2_data = energy_data.get("annual_CO2_emissions", {})
             current_emissions = co2_data.get("current_emissions", 1.8)
             potential_emissions = co2_data.get("potential_emissions", 1.2)
             emissions_metric = co2_data.get("emissions_metric", "tonnes CO2/year")
             
-            # Get recommendations from API
-            savings_data = energy_data.get("savings_and_recommendations", {})
-            api_recommendations = savings_data.get("energy_saving_recommendations", [])
+            # Energy consumption data
+            consumption_data = energy_data.get("energy_consumption", {})
+            current_consumption = consumption_data.get("current_annual_energy_consumption", 0)
+            potential_consumption = consumption_data.get("potential_annual_energy_consumption", 0)
+            consumption_metric = consumption_data.get("energy_consumption_metric", "kWh/m2")
             
-            recommendations = []
-            for rec in api_recommendations[:5]:  # Limit to top 5
-                rec_text = rec.get("recommendations", "")
-                min_cost = rec.get("min_installation_cost", 0)
-                max_cost = rec.get("max_installation_cost", 0)
-                
-                # Estimate carbon reduction (simplified calculation)
-                # Assuming each recommendation contributes proportionally to potential savings
-                total_reduction = current_emissions - potential_emissions
-                estimated_reduction = total_reduction / max(len(api_recommendations), 1)
-                
-                cost_str = f"£{min_cost:,}" if min_cost == max_cost else f"£{min_cost:,} - £{max_cost:,}"
-                
-                recommendations.append({
-                    "recommendation": rec_text,
-                    "potential_reduction": round(estimated_reduction, 2),
-                    "cost_estimate": cost_str,
-                })
+            # Energy costs
+            costs_data = energy_data.get("annual_energy_costs", {})
+            current_heating_cost = costs_data.get("current_annual_heating_cost", 0)
+            potential_heating_cost = costs_data.get("potential_annual_heating_cost", 0)
+            current_lighting_cost = costs_data.get("current_annual_lighting_cost", 0)
+            potential_lighting_cost = costs_data.get("potential_annual_lighting_cost", 0)
+            current_hotwater_cost = costs_data.get("current_annual_hot_water_cost", 0)
+            potential_hotwater_cost = costs_data.get("potential_annual_hot_water_cost", 0)
+            currency = costs_data.get("currency", "GBP")
+            
+            total_current_cost = current_heating_cost + current_lighting_cost + current_hotwater_cost
+            total_potential_cost = potential_heating_cost + potential_lighting_cost + potential_hotwater_cost
+            
+            # Environmental impact score
+            env_impact_data = energy_data.get("environmental_impact", {})
+            env_current_score = env_impact_data.get("current_score", 0)
+            env_potential_score = env_impact_data.get("potential_score", 0)
+            
+            # Property efficiency features
+            efficiency_data = energy_data.get("property_efficiency", {})
+            
+            # Extract key efficiency ratings
+            heating_efficiency = efficiency_data.get("property_main_heating_energy_efficiency", "")
+            windows_efficiency = efficiency_data.get("property_windows_energy_efficiency", "")
+            walls_efficiency = efficiency_data.get("property_walls_energy_efficiency", "")
+            lighting_efficiency = efficiency_data.get("property_lighting_energy_efficiency", "")
+            
+            # Create efficiency features list
+            efficiency_features = []
+            if heating_efficiency:
+                efficiency_features.append(f"Heating: {heating_efficiency}")
+            if windows_efficiency:
+                efficiency_features.append(f"Windows: {windows_efficiency}")
+            if walls_efficiency:
+                efficiency_features.append(f"Walls: {walls_efficiency}")
+            if lighting_efficiency:
+                efficiency_features.append(f"Lighting: {lighting_efficiency}")
             
             # Infer property type from API data if available
             api_property_type = energy_data.get("property_type", property_type)
             if api_property_type:
                 property_type = api_property_type.lower()
             
-            print(f"[CARBON] Processed data successfully:")
-            print(f"[CARBON]   - Current emissions: {current_emissions} {emissions_metric}")
-            print(f"[CARBON]   - Potential emissions: {potential_emissions} {emissions_metric}")
-            print(f"[CARBON]   - EPC rating: {energy_rating}")
-            print(f"[CARBON]   - Recommendations: {len(recommendations)}")
+            print(f"[SUSTAINABILITY] Processed data successfully:")
+            print(f"[SUSTAINABILITY]   - Current emissions: {current_emissions} {emissions_metric}")
+            print(f"[SUSTAINABILITY]   - Potential emissions: {potential_emissions} {emissions_metric}")
+            print(f"[SUSTAINABILITY]   - EPC rating: {energy_rating} (score: {energy_score})")
+            print(f"[SUSTAINABILITY]   - Energy consumption: {current_consumption} {consumption_metric}")
+            print(f"[SUSTAINABILITY]   - Annual energy cost: {currency}{total_current_cost}")
+            print(f"[SUSTAINABILITY]   - Environmental score: {env_current_score}")
         
         else:
             # No CO2 emissions data in response - this is required
@@ -512,6 +592,157 @@ async def execute_get_embodied_carbon(
         if potential_emissions is None or potential_emissions < 0:
             potential_emissions = current_emissions * 0.7  # Assume 30% reduction potential
         
+        # Calculate savings potential
+        emissions_savings = current_emissions - potential_emissions
+        cost_savings = total_current_cost - total_potential_cost
+        consumption_savings = current_consumption - potential_consumption
+        
+        print(f"\n[SUSTAINABILITY] Savings Potential:")
+        print(f"[SUSTAINABILITY]   - CO2 reduction: {emissions_savings:.2f} tonnes/year")
+        print(f"[SUSTAINABILITY]   - Cost savings: {currency}{cost_savings:.0f}/year")
+        print(f"[SUSTAINABILITY]   - Energy reduction: {consumption_savings:.0f} {consumption_metric}")
+        
+        # ======================================================================
+        # EMBODIED CARBON CALCULATION (EN 15978 / RICS Whole Life Carbon)
+        # ======================================================================
+        print(f"\n[EMBODIED CARBON] Calculating whole life carbon (A1-A5)...")
+        print(f"[EMBODIED CARBON] Standards: EN 15978:2011, RICS WLC 2nd Ed (2023)")
+        print(f"[EMBODIED CARBON] Property: {property_size} m² {property_type}")
+        
+        # Material quantities estimation (BoQ) based on property type and size
+        # Values based on UK typical residential construction
+        material_intensities = {
+            "flat": {
+                "concrete_m3_per_m2": 0.25,      # Less structural demand (shared walls/floors)
+                "rebar_kg_per_m2": 15,
+                "steel_kg_per_m2": 8,
+                "brick_units_per_m2": 45,
+                "timber_m3_per_m2": 0.02,
+            },
+            "apartment": {
+                "concrete_m3_per_m2": 0.25,
+                "rebar_kg_per_m2": 15,
+                "steel_kg_per_m2": 8,
+                "brick_units_per_m2": 45,
+                "timber_m3_per_m2": 0.02,
+            },
+            "terraced": {
+                "concrete_m3_per_m2": 0.35,
+                "rebar_kg_per_m2": 20,
+                "steel_kg_per_m2": 12,
+                "brick_units_per_m2": 60,
+                "timber_m3_per_m2": 0.04,
+            },
+            "semi-detached": {
+                "concrete_m3_per_m2": 0.4,
+                "rebar_kg_per_m2": 22,
+                "steel_kg_per_m2": 15,
+                "brick_units_per_m2": 70,
+                "timber_m3_per_m2": 0.045,
+            },
+            "detached": {
+                "concrete_m3_per_m2": 0.5,       # Full external envelope
+                "rebar_kg_per_m2": 25,
+                "steel_kg_per_m2": 18,
+                "brick_units_per_m2": 80,
+                "timber_m3_per_m2": 0.05,
+            },
+        }
+        
+        # Get material intensities for property type (default to flat)
+        intensities = material_intensities.get(property_type.lower(), material_intensities["flat"])
+        
+        # Calculate material quantities
+        concrete_m3 = property_size * intensities["concrete_m3_per_m2"]
+        rebar_kg = property_size * intensities["rebar_kg_per_m2"]
+        steel_kg = property_size * intensities["steel_kg_per_m2"]
+        brick_units = property_size * intensities["brick_units_per_m2"]
+        timber_m3 = property_size * intensities["timber_m3_per_m2"]
+        
+        print(f"[EMBODIED CARBON] Material quantities (BoQ):")
+        print(f"[EMBODIED CARBON]   - Concrete: {concrete_m3:.1f} m³")
+        print(f"[EMBODIED CARBON]   - Rebar steel: {rebar_kg:.1f} kg")
+        print(f"[EMBODIED CARBON]   - Structural steel: {steel_kg:.1f} kg")
+        print(f"[EMBODIED CARBON]   - Brick: {brick_units:.0f} units")
+        print(f"[EMBODIED CARBON]   - Timber: {timber_m3:.2f} m³")
+        
+        # A1-A3 Emission factors (kg CO₂e per unit) - from ICE Database v3.0 / EPDs
+        # These include raw material extraction + processing + manufacturing
+        emission_factors_a1_a3 = {
+            "concrete": 280,              # kg CO₂e/m³ (General Purpose)
+            "rebar": 1.20,                # kg CO₂e/kg (reinforcement steel)
+            "structural_steel": 1.70,     # kg CO₂e/kg
+            "brick": 0.22,                # kg CO₂e/unit (clay brick)
+            "timber": 110,                # kg CO₂e/m³ (softwood, construction grade)
+        }
+        
+        # A1-A3: Product stage (raw material + manufacturing)
+        a1_a3_concrete = concrete_m3 * emission_factors_a1_a3["concrete"]
+        a1_a3_rebar = rebar_kg * emission_factors_a1_a3["rebar"]
+        a1_a3_steel = steel_kg * emission_factors_a1_a3["structural_steel"]
+        a1_a3_brick = brick_units * emission_factors_a1_a3["brick"]
+        a1_a3_timber = timber_m3 * emission_factors_a1_a3["timber"]
+        
+        a1_a3_total = a1_a3_concrete + a1_a3_rebar + a1_a3_steel + a1_a3_brick + a1_a3_timber
+        
+        print(f"\n[EMBODIED CARBON] A1-A3 (Product stage - includes mining/smelting/quarrying):")
+        print(f"[EMBODIED CARBON]   - Concrete: {a1_a3_concrete:.0f} kg CO₂e")
+        print(f"[EMBODIED CARBON]   - Rebar: {a1_a3_rebar:.0f} kg CO₂e")
+        print(f"[EMBODIED CARBON]   - Steel: {a1_a3_steel:.0f} kg CO₂e")
+        print(f"[EMBODIED CARBON]   - Brick: {a1_a3_brick:.0f} kg CO₂e")
+        print(f"[EMBODIED CARBON]   - Timber: {a1_a3_timber:.0f} kg CO₂e")
+        print(f"[EMBODIED CARBON]   A1-A3 Total: {a1_a3_total:.0f} kg CO₂e")
+        
+        # A4: Transportation to site
+        # Assumption: Average 120 km, truck transport 0.1 kg CO₂e / t·km
+        transport_distance_km = 120
+        transport_factor = 0.1  # kg CO₂e / t·km
+        
+        # Total mass transported (convert to tonnes)
+        total_mass_tonnes = (rebar_kg + steel_kg) / 1000 + concrete_m3 * 2.4 + brick_units * 0.0025 + timber_m3 * 0.5
+        
+        a4_transport = total_mass_tonnes * transport_distance_km * transport_factor
+        
+        print(f"\n[EMBODIED CARBON] A4 (Transportation):")
+        print(f"[EMBODIED CARBON]   - Distance: {transport_distance_km} km")
+        print(f"[EMBODIED CARBON]   - Total mass: {total_mass_tonnes:.1f} tonnes")
+        print(f"[EMBODIED CARBON]   A4 Total: {a4_transport:.0f} kg CO₂e")
+        
+        # A5: Construction & installation (on-site energy, waste, temporary works)
+        # RICS default: 5% of A1-A3
+        a5_construction = a1_a3_total * 0.05
+        
+        print(f"\n[EMBODIED CARBON] A5 (Construction/installation - 5% of A1-A3):")
+        print(f"[EMBODIED CARBON]   A5 Total: {a5_construction:.0f} kg CO₂e")
+        
+        # Total embodied carbon (A1-A5)
+        embodied_carbon_total_kg = a1_a3_total + a4_transport + a5_construction
+        embodied_carbon_total_tonnes = embodied_carbon_total_kg / 1000
+        
+        # Embodied carbon per m² (normalized)
+        embodied_carbon_per_m2 = embodied_carbon_total_kg / property_size
+        
+        # Annualized embodied carbon (60-year reference study period)
+        reference_study_period_years = 60
+        embodied_carbon_annual_tonnes = embodied_carbon_total_tonnes / reference_study_period_years
+        
+        print(f"\n[EMBODIED CARBON] Summary (EN 15978 compliant):")
+        print(f"[EMBODIED CARBON]   - Total A1-A5: {embodied_carbon_total_tonnes:.1f} tonnes CO₂e")
+        print(f"[EMBODIED CARBON]   - Per m² (GIA): {embodied_carbon_per_m2:.0f} kg CO₂e/m²")
+        print(f"[EMBODIED CARBON]   - Annualized (60 yrs): {embodied_carbon_annual_tonnes:.2f} tonnes CO₂e/year")
+        print(f"[EMBODIED CARBON]   - Reference study period: {reference_study_period_years} years")
+        print(f"[EMBODIED CARBON]   - Standards: EN 15978:2011 / RICS WLC")
+        
+        # Breakdown for reporting
+        embodied_carbon_breakdown = {
+            "a1_a3_total": a1_a3_total / 1000,  # tonnes
+            "a4_transport": a4_transport / 1000,
+            "a5_construction": a5_construction / 1000,
+            "total": embodied_carbon_total_tonnes,
+            "per_m2": embodied_carbon_per_m2,
+            "annualized": embodied_carbon_annual_tonnes,
+        }
+        
         # Build A2UI messages
         a2ui_messages = build_carbon_card(
             location=property_address,
@@ -519,22 +750,42 @@ async def execute_get_embodied_carbon(
             potential_emissions=potential_emissions,
             emissions_metric=emissions_metric,
             energy_rating=energy_rating,
+            potential_rating=potential_rating,
             property_size=property_size,
             property_type=property_type,
-            recommendations=recommendations,
+            current_consumption=current_consumption,
+            potential_consumption=potential_consumption,
+            consumption_metric=consumption_metric,
+            current_energy_cost=total_current_cost,
+            potential_energy_cost=total_potential_cost,
+            currency=currency,
+            environmental_score=env_current_score,
+            potential_environmental_score=env_potential_score,
+            efficiency_features=efficiency_features,
+            embodied_carbon_total=embodied_carbon_total_tonnes,
+            embodied_carbon_per_m2=embodied_carbon_per_m2,
+            embodied_carbon_annual=embodied_carbon_annual_tonnes,
+            embodied_carbon_a1_a3=a1_a3_total / 1000,
+            embodied_carbon_a4=a4_transport / 1000,
+            embodied_carbon_a5=a5_construction / 1000,
         )
+        print(f"[CARBON] Received {len(a2ui_messages)} messages from build_carbon_card")
+        for i, msg in enumerate(a2ui_messages):
+            print(f"[CARBON]   Message {i}: {list(msg.keys())}")
         
-        # Generate summary
-        reduction_percent = ((current_emissions - potential_emissions) / current_emissions) * 100
+        # Generate summary (balanced length ~130 words)
+        reduction_percent = ((current_emissions - potential_emissions) / current_emissions) * 100 if current_emissions > 0 else 0
+        total_annual_carbon = current_emissions + embodied_carbon_annual_tonnes
+        
         summary = (
-            f"For {property_address}, the property currently emits {current_emissions:.1f} tonnes of CO2 per year "
-            f"with an EPC rating of {energy_rating}. "
-            f"With recommended improvements, emissions could be reduced to {potential_emissions:.1f} tonnes/year "
-            f"(a {reduction_percent:.0f}% reduction). "
+            f"This {property_size:.0f}m² {property_type} has an EPC rating of {energy_rating} (score {energy_score}/100) with current operational emissions "
+            f"of {current_emissions:.1f} tonnes CO₂ per year. Through energy efficiency improvements, emissions could be reduced by {reduction_percent:.0f}% "
+            f"to {potential_emissions:.1f} tonnes/year, achieving a potential {potential_rating} rating. "
+            f"The property's embodied carbon footprint totals {embodied_carbon_total_tonnes:.1f} tonnes CO₂e from construction materials and processes, "
+            f"which translates to approximately {embodied_carbon_annual_tonnes:.2f} tonnes/year when amortized over a 60-year lifespan. "
+            f"Combined with operational emissions, the total annual carbon footprint is {total_annual_carbon:.2f} tonnes CO₂e/year. "
+            f"See the Sustainability tab for detailed breakdowns, energy costs, and improvement recommendations."
         )
-        
-        if recommendations:
-            summary += f"Top recommendations include: {', '.join([r['recommendation'] for r in recommendations[:2]])}."
         
         return EmbodiedCarbonResult(
             success=True,
@@ -545,7 +796,7 @@ async def execute_get_embodied_carbon(
             energy_rating=energy_rating,
             property_size=property_size,
             property_type=property_type,
-            recommendations=recommendations,
+            recommendations=[],
             a2ui_messages=a2ui_messages,
             summary=summary,
         )

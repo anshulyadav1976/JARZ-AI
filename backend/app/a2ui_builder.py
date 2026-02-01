@@ -304,28 +304,83 @@ def build_carbon_card(
     potential_emissions: float,
     emissions_metric: str,
     energy_rating: str,
+    potential_rating: str,
     property_size: float,
     property_type: str,
-    recommendations: list[dict],
+    current_consumption: float,
+    potential_consumption: float,
+    consumption_metric: str,
+    current_energy_cost: float,
+    potential_energy_cost: float,
+    currency: str,
+    environmental_score: int,
+    potential_environmental_score: int,
+    efficiency_features: list[str],
+    embodied_carbon_total: float,
+    embodied_carbon_per_m2: float,
+    embodied_carbon_annual: float,
+    embodied_carbon_a1_a3: float,
+    embodied_carbon_a4: float,
+    embodied_carbon_a5: float,
 ) -> list[dict]:
-    """Build CarbonCard A2UI component for embodied carbon display."""
+    """Build CarbonCard A2UI component for sustainability assessment."""
     messages = []
+    
+    # Data model update for carbon data
+    messages.append(build_data_model_update([
+        {"key": "location", "valueString": location},
+        {"key": "current_emissions", "valueNumber": current_emissions},
+        {"key": "potential_emissions", "valueNumber": potential_emissions},
+        {"key": "emissions_metric", "valueString": emissions_metric},
+        {"key": "energy_rating", "valueString": energy_rating},
+        {"key": "potential_rating", "valueString": potential_rating},
+        {"key": "property_size", "valueNumber": property_size},
+        {"key": "property_type", "valueString": property_type},
+        {"key": "current_consumption", "valueNumber": current_consumption},
+        {"key": "potential_consumption", "valueNumber": potential_consumption},
+        {"key": "consumption_metric", "valueString": consumption_metric},
+        {"key": "current_energy_cost", "valueNumber": current_energy_cost},
+        {"key": "potential_energy_cost", "valueNumber": potential_energy_cost},
+        {"key": "currency", "valueString": currency},
+        {"key": "environmental_score", "valueNumber": environmental_score},
+        {"key": "potential_environmental_score", "valueNumber": potential_environmental_score},
+        {"key": "efficiency_features", "valueString": ", ".join(efficiency_features) if efficiency_features else "Standard efficiency"},
+        {"key": "embodied_carbon_total", "valueNumber": embodied_carbon_total},
+        {"key": "embodied_carbon_per_m2", "valueNumber": embodied_carbon_per_m2},
+        {"key": "embodied_carbon_annual", "valueNumber": embodied_carbon_annual},
+        {"key": "embodied_carbon_a1_a3", "valueNumber": embodied_carbon_a1_a3},
+        {"key": "embodied_carbon_a4", "valueNumber": embodied_carbon_a4},
+        {"key": "embodied_carbon_a5", "valueNumber": embodied_carbon_a5},
+    ], path="/carbon"))
     
     # Build carbon card component
     carbon_component = {
         "id": "carbon_card",
         "component": {
             "CarbonCard": {
-                "location": _literal_string(location),
-                "currentEmissions": _literal_number(current_emissions),
-                "potentialEmissions": _literal_number(potential_emissions),
-                "emissionsMetric": _literal_string(emissions_metric),
-                "energyRating": _literal_string(energy_rating),
-                "propertySize": _literal_number(property_size),
-                "propertyType": _literal_string(property_type),
-                "reductionPercent": _literal_number(
-                    ((current_emissions - potential_emissions) / current_emissions) * 100
-                ),
+                "location": _data_path("carbon/location"),
+                "currentEmissions": _data_path("carbon/current_emissions"),
+                "potentialEmissions": _data_path("carbon/potential_emissions"),
+                "emissionsMetric": _data_path("carbon/emissions_metric"),
+                "energyRating": _data_path("carbon/energy_rating"),
+                "potentialRating": _data_path("carbon/potential_rating"),
+                "propertySize": _data_path("carbon/property_size"),
+                "propertyType": _data_path("carbon/property_type"),
+                "currentConsumption": _data_path("carbon/current_consumption"),
+                "potentialConsumption": _data_path("carbon/potential_consumption"),
+                "consumptionMetric": _data_path("carbon/consumption_metric"),
+                "currentEnergyCost": _data_path("carbon/current_energy_cost"),
+                "potentialEnergyCost": _data_path("carbon/potential_energy_cost"),
+                "currency": _data_path("carbon/currency"),
+                "environmentalScore": _data_path("carbon/environmental_score"),
+                "potentialEnvironmentalScore": _data_path("carbon/potential_environmental_score"),
+                "efficiencyFeatures": _data_path("carbon/efficiency_features"),
+                "embodiedCarbonTotal": _data_path("carbon/embodied_carbon_total"),
+                "embodiedCarbonPerM2": _data_path("carbon/embodied_carbon_per_m2"),
+                "embodiedCarbonAnnual": _data_path("carbon/embodied_carbon_annual"),
+                "embodiedCarbonA1A3": _data_path("carbon/embodied_carbon_a1_a3"),
+                "embodiedCarbonA4": _data_path("carbon/embodied_carbon_a4"),
+                "embodiedCarbonA5": _data_path("carbon/embodied_carbon_a5"),
             }
         }
     }
@@ -333,13 +388,12 @@ def build_carbon_card(
     # Surface update with carbon component
     messages.append(build_surface_update([carbon_component]))
     
-    # Data model update with recommendations
-    messages.append(build_data_model_update([
-        {"key": "recommendations", "valueArray": recommendations},
-    ], path="/carbon"))
-    
-    # Begin rendering (if needed)
+    # Begin rendering
     messages.append(build_begin_rendering("carbon_card"))
+    
+    print(f"[CARBON A2UI] Returning {len(messages)} messages:")
+    for i, msg in enumerate(messages):
+        print(f"[CARBON A2UI]   Message {i}: {list(msg.keys())}")
     
     return messages
 

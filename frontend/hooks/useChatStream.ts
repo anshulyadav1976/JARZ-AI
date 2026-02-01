@@ -82,10 +82,12 @@ export function useChatStream(): UseChatStreamResult {
   }, []);
 
   const processA2UIMessage = useCallback((message: A2UIMessage) => {
+    console.log("[processA2UIMessage] Processing message:", message);
     setState((prev) => {
       const newA2UIState = { ...prev.a2uiState };
 
       if ("surfaceUpdate" in message) {
+        console.log("[processA2UIMessage] Surface update with", message.surfaceUpdate.components.length, "components");
         const newComponents = new Map(prev.a2uiState.components);
         for (const comp of message.surfaceUpdate.components) {
           newComponents.set(comp.id, comp);
@@ -94,6 +96,7 @@ export function useChatStream(): UseChatStreamResult {
       }
 
       if ("dataModelUpdate" in message) {
+        console.log("[processA2UIMessage] Data model update at path:", message.dataModelUpdate.path);
         const update = message.dataModelUpdate;
         const newDataModel = { ...prev.a2uiState.dataModel };
 
@@ -135,9 +138,11 @@ export function useChatStream(): UseChatStreamResult {
         }
 
         newA2UIState.dataModel = newDataModel;
+        console.log("[processA2UIMessage] Updated data model:", newA2UIState.dataModel);
       }
 
       if ("beginRendering" in message) {
+        console.log("[processA2UIMessage] Begin rendering root:", message.beginRendering.root);
         newA2UIState.rootId = message.beginRendering.root;
         newA2UIState.isReady = true;
       }
@@ -292,6 +297,7 @@ export function useChatStream(): UseChatStreamResult {
                     }));
                   } else if (currentEvent === "a2ui") {
                     // A2UI message
+                    console.log("[A2UI] Received message:", data);
                     hasReceivedA2UI = true;
                     processA2UIMessage(data);
                   } else if (currentEvent === "error" && data.error) {

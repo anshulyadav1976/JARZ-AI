@@ -19,7 +19,7 @@ Start-Sleep -Seconds 2
 Write-Host "Starting frontend server (port 3000)..." -ForegroundColor Yellow
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\frontend'; npm run dev"
 
-Write-Host ""
+Write-Host 
 Write-Host "✓ Backend running on http://127.0.0.1:8000" -ForegroundColor Green
 Write-Host "✓ Frontend running on http://localhost:3000" -ForegroundColor Green
 Write-Host ""
