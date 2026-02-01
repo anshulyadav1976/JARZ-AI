@@ -241,11 +241,17 @@ export default function Home() {
       console.log("[AUTO-SWITCH] Has investment:", !!dataModel.investment);
       console.log("[AUTO-SWITCH] Has prediction:", !!dataModel.prediction);
       console.log("[AUTO-SWITCH] Has carbon:", !!dataModel.carbon);
+      console.log("[AUTO-SWITCH] Has comparison:", !!dataModel.comparison);
       
       // Property listings tool → properties tab
       if (dataModel.listings?.properties) {
         console.log("[AUTO-SWITCH] Switching to properties tab");
         setSidebarMode("properties");
+      }
+      // Location comparison tool → comparison tab
+      else if (dataModel.comparison) {
+        console.log("[AUTO-SWITCH] Switching to comparison tab");
+        setSidebarMode("comparison");
       }
       // Investment analysis tool → investment tab
       else if (dataModel.investment) {
