@@ -80,6 +80,10 @@ class InvestmentAnalysisResult:
     break_even_years: float
     total_investment: float
     market_metrics: dict
+    interest_coverage_ratio: float  # NEW: ICR percentage (125% = lender standard)
+    icr_pass: bool  # NEW: Whether ICR meets 125% threshold
+    min_rent_for_icr: float  # NEW: Minimum rent needed for 125% ICR
+    min_deposit_percent_for_icr: float  # NEW: Minimum deposit % for 125% ICR
     a2ui_messages: list[dict]
     summary: str
 
@@ -218,13 +222,18 @@ TOOL_DEFINITIONS = [
                 },
                 "mortgage_rate": {
                     "type": "number",
-                    "description": "Annual mortgage interest rate percentage (default 4.5%).",
-                    "default": 4.5
+                    "description": "Annual mortgage interest rate percentage. If not provided, will fetch real-time UK mortgage rates from Bank of England."
                 },
                 "mortgage_years": {
                     "type": "number",
                     "description": "Mortgage term in years (default 25).",
                     "default": 25
+                },
+                "mortgage_type": {
+                    "type": "string",
+                    "description": "Mortgage type: 'interest_only' (default, recommended for BTL) or 'repayment'. Interest-only maximizes cash flow by only paying interest, not principal.",
+                    "enum": ["interest_only", "repayment"],
+                    "default": "interest_only"
                 }
             },
             "required": ["location"]
@@ -1062,8 +1071,9 @@ async def execute_tool(tool_name: str, arguments: dict[str, Any]) -> dict[str, A
             location=arguments["location"],
             property_value=arguments.get("property_value"),
             deposit_percent=arguments.get("deposit_percent", 25),
-            mortgage_rate=arguments.get("mortgage_rate", 4.5),
+            mortgage_rate=arguments.get("mortgage_rate"),
             mortgage_years=arguments.get("mortgage_years", 25),
+            mortgage_type=arguments.get("mortgage_type", "interest_only"),
         )
         return {
             "success": result.success,

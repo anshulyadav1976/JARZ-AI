@@ -240,12 +240,16 @@ async def generate_chat_sse_events(
                 }
             
             elif event_type == "text":
+                content = event.get("content", "")
+                print(f"[SSE] Received text event, content length: {len(content)}, preview: {content[:100]}")
                 yield {
                     "event": "text",
                     "data": json.dumps({
-                        "content": event.get("content", ""),
+                        "content": content,
                     }),
                 }
+                print(f"[SSE] Yielded text event")
+
             
             elif event_type == "tool_start":
                 yield {
