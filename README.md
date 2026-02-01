@@ -2,15 +2,6 @@
 
 RentRadar is a **chat-first UK property assistant**. You type questions, the agent calls tools (market data, listings, valuation/investment calculations), and the UI updates live via **A2UI** streamed over **SSE**.
 
-## What you can demo in 60 seconds
-
-- Ask: “What’s the rent forecast for `NW1`?”
-  - You get: **P10/P50/P90** forecast + drivers + charts + neighborhood context.
-- Ask: “Give me market data for `NW1 0BJ`”
-  - You get: growth trend, rent/sale demand, valuations + sale history, with export.
-- Ask: “Compare `NW1` vs `E14`”
-  - You get: side-by-side summary, ranges, and listings comparison.
-
 ## Architecture (at a glance)
 
 ```mermaid
@@ -24,6 +15,67 @@ flowchart LR
 ```
 
 More diagrams and flows: `docs/architecture.md`
+
+## System diagrams
+
+### Data flow (chat + tools + UI streaming)
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant FE as Frontend (Next.js)
+  participant BE as Backend (FastAPI)
+  participant LG as LangGraph Chat Graph
+  participant LLM as LLM (OpenRouter)
+  participant SS as ScanSan (optional)
+  participant DB as SQLite (chat.db)
+  participant C as Cache (backend/cache.json)
+
+  U->>FE: types a message
+  FE->>BE: POST /api/chat/stream (SSE)
+  BE->>DB: persist user message
+  BE->>LG: stream_chat_agent(messages, tools)
+  LG->>LLM: system prompt + tool schemas
+  LLM-->>LG: tool_calls OR final text
+
+  alt tool_calls
+    LG->>C: check cache (tool + scansan)
+    LG->>SS: call ScanSan endpoints (if enabled)
+    SS-->>LG: JSON response
+    LG->>C: persist cache entry
+    BE-->>FE: SSE event: a2ui (UI updates)
+    BE-->>FE: SSE event: tool_end (status)
+    LG->>LLM: follow-up with tool output
+  end
+
+  BE-->>FE: SSE event: text (streamed)
+  BE->>DB: persist assistant message + a2ui_snapshot
+  BE-->>FE: SSE event: complete (includes conversation_id)
+```
+
+### Data flow (Market Data tab)
+
+```mermaid
+flowchart TB
+  FE[MarketDataPanel] -->|GET /api/district/{district}/growth| BE
+  FE -->|GET /api/district/{district}/rent/demand| BE
+  FE -->|GET /api/district/{district}/sale/demand| BE
+  FE -->|GET /api/postcode/{postcode}/valuations/current| BE
+  FE -->|GET /api/postcode/{postcode}/valuations/historical| BE
+  FE -->|GET /api/postcode/{postcode}/sale/history| BE
+  BE -->|ScanSanClient| SS[ScanSan API]
+  BE -->|persistent JSON TTL| C[(backend/cache.json)]
+  BE -->|JSON| FE
+```
+
+### LangGraph flow (chat agent loop + tool calls)
+
+```mermaid
+flowchart LR
+  CHAT[chat node] -->|tool calls| TOOLS[tool_executor node]
+  TOOLS --> CHAT
+  CHAT -->|final response| END((END))
+```
 
 ## Key features
 
@@ -116,12 +168,13 @@ We predict quantiles to produce **uncertainty bands** instead of a single number
 
 Pinball (quantile) loss for quantile \(q\):
 
-\[
-\rho_q(u) = \begin{cases}
-q \cdot u & \text{if } u \ge 0 \\
-(q - 1)\cdot u & \text{if } u < 0
+$$
+\rho_q(u)=
+\begin{cases}
+q\cdot u & \text{if } u \ge 0 \\
+(q-1)\cdot u & \text{if } u < 0
 \end{cases}
-\]
+$$
 
 We train separate models for \(q \in \{0.1, 0.5, 0.9\}\) → **P10/P50/P90**.
 
@@ -129,9 +182,9 @@ We train separate models for \(q \in \{0.1, 0.5, 0.9\}\) → **P10/P50/P90**.
 
 We capture neighborhood effects by averaging neighbor signals:
 
-\[
+$$
 \text{spatial\_rent\_neighbor\_avg}=\frac{1}{K}\sum_{i=1}^{K}\text{rent}_i
-\]
+$$
 
 ### Explainability (SHAP)
 
