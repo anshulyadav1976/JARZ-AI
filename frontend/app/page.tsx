@@ -80,14 +80,14 @@ export default function Home() {
   }, []);
 
   const hasA2UIContent = state.a2uiState.isReady && state.a2uiState.rootId;
-  console.log("[PAGE] hasA2UIContent:", hasA2UIContent, "isReady:", state.a2uiState.isReady, "rootId:", state.a2uiState.rootId);
+  // console.log("[PAGE] hasA2UIContent:", hasA2UIContent, "isReady:", state.a2uiState.isReady, "rootId:", state.a2uiState.rootId);
   
   // Helper function to filter A2UI state by data model path
   const filterA2UIByPath = useCallback((path: string) => {
-    console.log("[filterA2UIByPath] Called with path:", path);
-    console.log("[filterA2UIByPath] Full data model:", state.a2uiState.dataModel);
+    // console.log("[filterA2UIByPath] Called with path:", path);
+    // console.log("[filterA2UIByPath] Full data model:", state.a2uiState.dataModel);
     if (!state.a2uiState.dataModel) {
-      console.log("[filterA2UIByPath] No data model, returning empty state");
+      // console.log("[filterA2UIByPath] No data model, returning empty state");
       return state.a2uiState;
     }
     
@@ -97,10 +97,10 @@ export default function Home() {
       dataModel
     );
     
-    console.log("[filterA2UIByPath] Path data for", path, ":", pathData);
+    // console.log("[filterA2UIByPath] Path data for", path, ":", pathData);
     
     if (!pathData) {
-      console.log("[filterA2UIByPath] No data at path, returning not ready");
+      // console.log("[filterA2UIByPath] No data at path, returning not ready");
       return { ...state.a2uiState, isReady: false };
     }
     
@@ -128,36 +128,36 @@ export default function Home() {
     if (hasA2UIContent && state.a2uiState.dataModel && autoSwitchEnabled) {
       const dataModel = state.a2uiState.dataModel as any;
       
-      console.log("[AUTO-SWITCH] Data model:", dataModel);
-      console.log("[AUTO-SWITCH] Has listings:", !!dataModel.listings);
-      console.log("[AUTO-SWITCH] Has properties:", !!dataModel.listings?.properties);
-      console.log("[AUTO-SWITCH] Has investment:", !!dataModel.investment);
-      console.log("[AUTO-SWITCH] Has prediction:", !!dataModel.prediction);
-      console.log("[AUTO-SWITCH] Has carbon:", !!dataModel.carbon);
+      // console.log("[AUTO-SWITCH] Data model:", dataModel);
+      // console.log("[AUTO-SWITCH] Has listings:", !!dataModel.listings);
+      // console.log("[AUTO-SWITCH] Has properties:", !!dataModel.listings?.properties);
+      // console.log("[AUTO-SWITCH] Has investment:", !!dataModel.investment);
+      // console.log("[AUTO-SWITCH] Has prediction:", !!dataModel.prediction);
+      // console.log("[AUTO-SWITCH] Has carbon:", !!dataModel.carbon);
       
       // Property listings tool → properties tab
       if (dataModel.listings?.properties) {
-        console.log("[AUTO-SWITCH] Switching to properties tab");
+        // console.log("[AUTO-SWITCH] Switching to properties tab");
         setSidebarMode("properties");
       }
       // Investment analysis tool → investment tab
       else if (dataModel.investment) {
-        console.log("[AUTO-SWITCH] Switching to investment tab");
+        // console.log("[AUTO-SWITCH] Switching to investment tab");
         setSidebarMode("investment");
       }
       // Carbon/sustainability tool → sustainability tab
       else if (dataModel.carbon) {
-        console.log("[AUTO-SWITCH] Switching to sustainability tab");
+        // console.log("[AUTO-SWITCH] Switching to sustainability tab");
         setSidebarMode("sustainability");
       }
       // Rent forecast or other prediction tools → valuation tab
       else if (dataModel.prediction) {
-        console.log("[AUTO-SWITCH] Switching to valuation tab");
+        // console.log("[AUTO-SWITCH] Switching to valuation tab");
         setSidebarMode("valuation");
       }
       // Default: valuation tab for any other A2UI content
       else {
-        console.log("[AUTO-SWITCH] Defaulting to valuation tab");
+        // console.log("[AUTO-SWITCH] Defaulting to valuation tab");
         setSidebarMode("valuation");
       }
     }
@@ -428,15 +428,19 @@ export default function Home() {
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex-1 overflow-hidden">
                   {viewMode === "list" ? (
-                    <PropertyListView 
-                      properties={propertiesFromAgent.length > 0 ? propertiesFromAgent : propertyState.properties}
-                      isLoading={state.isLoading || propertyState.isLoading}
-                      error={propertyState.error}
-                    />
+                    <div className="h-full overflow-y-auto p-4">
+                      <PropertyListView 
+                        properties={propertiesFromAgent.length > 0 ? propertiesFromAgent : propertyState.properties}
+                        isLoading={state.isLoading || propertyState.isLoading}
+                        error={propertyState.error}
+                      />
+                    </div>
                   ) : (
-                    <PropertyMapView />
+                    <PropertyMapView 
+                      properties={propertiesFromAgent.length > 0 ? propertiesFromAgent : propertyState.properties}
+                    />
                   )}
                 </div>
               </div>

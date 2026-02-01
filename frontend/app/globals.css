@@ -37,6 +37,43 @@ body {
   display: none; /* Chrome, Safari, Opera */
 }
 
+/* Mapbox custom marker styles */
+.custom-marker {
+  cursor: pointer;
+}
+
+.custom-marker .marker-content {
+  transition: all 0.2s ease;
+}
+
+.custom-marker:hover .marker-content {
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.mapboxgl-popup-content {
+  padding: 0;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+.mapboxgl-popup-close-button {
+  font-size: 24px;
+  padding: 8px;
+  color: white;
+  background: rgba(0,0,0,0.5);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  line-height: 1;
+  right: 8px;
+  top: 8px;
+}
+
+.mapboxgl-popup-close-button:hover {
+  background: rgba(0,0,0,0.7);
+}
+
 
 
 @layer base {
