@@ -8,8 +8,8 @@ This doc is intended for hackathon judges and teammates who want to understand *
 flowchart LR
   U[User in browser] -->|chat message| FE[Next.js Frontend]
   FE -->|SSE POST /api/chat/stream| BE[FastAPI Backend]
-  BE -->|OpenRouter (OpenAI-compatible)| LLM[LLM]
-  BE -->|HTTP (optional)| SS[ScanSan API]
+  BE -->|OpenRouter - OpenAI compatible| LLM[LLM]
+  BE -->|HTTP optional| SS[ScanSan API]
   BE -->|SQLite| DB[(chat.db)]
   BE -->|JSON TTL cache| C[(backend/cache.json)]
 
@@ -52,23 +52,23 @@ sequenceDiagram
   participant BE as Backend
   participant LG as LangGraph Chat Graph
   participant LLM as LLM
-  participant SS as ScanSan (optional)
+  participant SS as ScanSan optional
 
-  FE->>BE: POST /api/chat/stream {message, conversation_id?, profile?}
-  BE->>LG: stream_chat_agent(...)
-  BE-->>FE: event: status {"node":"chat","status":"thinking"}
+  FE->>BE: POST /api/chat/stream
+  BE->>LG: stream_chat_agent
+  BE-->>FE: event status
   LG->>LLM: prompt + tool schemas
   LLM-->>LG: tool_calls OR final text
   alt tool_calls
-    BE-->>FE: event: tool_start {"tool": "...", "arguments": {...}}
-    LG->>SS: call ScanSan endpoints (optional)
-    LG-->>BE: tool result (maybe with a2ui messages)
-    BE-->>FE: event: a2ui {...}
-    BE-->>FE: event: tool_end {"tool":"...","success":true/false}
-    LG->>LLM: follow-up prompt with tool output
+    BE-->>FE: event tool_start
+    LG->>SS: call ScanSan endpoints
+    LG-->>BE: tool result
+    BE-->>FE: event a2ui
+    BE-->>FE: event tool_end
+    LG->>LLM: follow-up with tool output
   end
-  BE-->>FE: event: text {"content":"...streamed..."}
-  BE-->>FE: event: complete {"status":"complete","conversation_id":"..."}
+  BE-->>FE: event text streamed
+  BE-->>FE: event complete
 ```
 
 ## LangGraph: what graphs exist
@@ -108,12 +108,12 @@ Market Data (growth/demand/valuations/sale history) is loaded via backend endpoi
 
 ```mermaid
 flowchart TB
-  FE[MarketDataPanel] -->|GET /api/district/{district}/growth| BE
-  FE -->|GET /api/district/{district}/rent/demand| BE
-  FE -->|GET /api/district/{district}/sale/demand| BE
-  FE -->|GET /api/postcode/{postcode}/valuations/current| BE
-  FE -->|GET /api/postcode/{postcode}/valuations/historical| BE
-  FE -->|GET /api/postcode/{postcode}/sale/history| BE
+  FE[MarketDataPanel] -->|GET district growth| BE
+  FE -->|GET district rent demand| BE
+  FE -->|GET district sale demand| BE
+  FE -->|GET postcode valuations current| BE
+  FE -->|GET postcode valuations historical| BE
+  FE -->|GET postcode sale history| BE
   BE --> SS[ScanSan API]
   SS --> BE
   BE -->|JSON responses| FE
