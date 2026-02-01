@@ -19,10 +19,11 @@ import { BarChart3, Home as HomeIcon, User, TrendingUp, Home as Building, List, 
 
 export default function Home() {
   const { state, sendMessage, reset } = useChatStream();
-  const { state: propertyState, fetchListings } = usePropertyListings();
+  const { state: propertyState, fetchListings, fetchListingsBoth } = usePropertyListings();
   const [activeTab, setActiveTab] = useState("home");
   const [sidebarMode, setSidebarMode] = useState<"valuation" | "properties" | "sustainability" | "investment" | "search">("valuation");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [listingFilterType, setListingFilterType] = useState<"all" | "rent" | "sale">("all");
   const [comparedAreas, setComparedAreas] = useState<string[]>([]);
   const [savedAreas, setSavedAreas] = useState<string[]>([]);
   const [currentArea, setCurrentArea] = useState<string>("");
@@ -37,13 +38,15 @@ export default function Home() {
     if (areaCodeMatch) {
       const areaCode = areaCodeMatch[1].toUpperCase();
       setCurrentArea(areaCode);
+      // Default to showing all listings on new postcode
+      setListingFilterType("all");
       
       // If in properties mode, fetch listings
       if (sidebarMode === "properties") {
-        fetchListings(areaCode, "sale");
+        fetchListingsBoth(areaCode);
       }
     }
-  }, [sendMessage, sidebarMode, fetchListings]);
+  }, [sendMessage, sidebarMode, fetchListingsBoth]);
 
   const handleReset = useCallback(() => {
     reset();
@@ -199,6 +202,26 @@ export default function Home() {
 
   const propertiesFromAgent = getPropertiesFromDataModel();
 
+  // Auto-fetch listings when area or filter changes (no click needed)
+  useEffect(() => {
+    if (!currentArea) return;
+    const h = setTimeout(() => {
+      if (listingFilterType === "all") {
+        fetchListingsBoth(currentArea);
+      } else {
+        fetchListings(currentArea, listingFilterType);
+      }
+    }, 500);
+    return () => clearTimeout(h);
+  }, [currentArea, listingFilterType, fetchListings, fetchListingsBoth]);
+
+  // Reset filter to "all" when postcode changes to show both initially
+  useEffect(() => {
+    if (currentArea) {
+      setListingFilterType("all");
+    }
+  }, [currentArea]);
+
   return (
     <main className="h-screen w-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/20 overflow-hidden">
       <header className="flex-shrink-0 border-b bg-card/80 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60">
@@ -237,8 +260,7 @@ export default function Home() {
       </header>
 
       <div className="flex-1 flex overflow-hidden w-full min-h-0">
-        {/* Sidebar - only show after user sends first message */}
-        {state.messages.length > 0 && (
+        {/* Sidebar - always shown */}
           <div className="w-14 flex-shrink-0 border-r bg-card/50 flex flex-col items-center justify-start py-3 gap-1.5">
             <Tooltip content="Valuation & Insights" side="right">
               <Button
@@ -291,7 +313,6 @@ export default function Home() {
               </Button>
             </Tooltip>
           </div>
-        )}
 
         {/* Chat Panel */}
         <div className={`flex-shrink-0 border-r transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "w-full md:w-[45%] lg:w-[38%]" : "w-full"}`}>
@@ -402,9 +423,32 @@ export default function Home() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-lg font-semibold text-foreground">Property Finder</h2>
-                      <p className="text-xs text-muted-foreground">Find properties with images, links, and reviews</p>
+                      <p className="text-xs text-muted-foreground">Type an area code (e.g., NW1) and fetch listings</p>
                     </div>
-                    <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                    <div className="flex items-center gap-2">
+                      {/* Listing type dropdown (also triggers fetch) */}
+                      <select
+                        value={listingFilterType}
+                        onChange={(e) => {
+                          const val = e.target.value as "all" | "rent" | "sale";
+                          setListingFilterType(val);
+                          if (currentArea) {
+                            if (val === "all") {
+                              fetchListingsBoth(currentArea);
+                            } else {
+                              fetchListings(currentArea, val);
+                            }
+                          }
+                        }}
+                        className="h-7 px-2 text-xs border rounded-md bg-background"
+                        aria-label="Listing Type"
+                      >
+                        <option value="all">All</option>
+                        <option value="rent">Rent</option>
+                        <option value="sale">Sale</option>
+                      </select>
+                      {/* View toggle */}
+                      <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                       <Button
                         variant={viewMode === "list" ? "secondary" : "ghost"}
                         size="sm"
@@ -423,7 +467,17 @@ export default function Home() {
                         <Map className="h-4 w-4 mr-1" />
                         <span className="text-xs">Map</span>
                       </Button>
+                      </div>
                     </div>
+                  </div>
+                  {/* Area code input (auto-fetch) */}
+                  <div className="mt-3 grid grid-cols-1 gap-2">
+                    <input
+                      className="h-9 px-3 border rounded-md bg-background text-sm"
+                      placeholder="Enter area code (e.g., NW1)"
+                      value={currentArea}
+                      onChange={(e) => setCurrentArea(e.target.value.toUpperCase())}
+                    />
                   </div>
                 </div>
 
@@ -434,9 +488,12 @@ export default function Home() {
                       properties={propertiesFromAgent.length > 0 ? propertiesFromAgent : propertyState.properties}
                       isLoading={state.isLoading || propertyState.isLoading}
                       error={propertyState.error}
+                      forcedFilterType={listingFilterType}
                     />
                   ) : (
-                    <PropertyMapView />
+                    <PropertyMapView 
+                      properties={propertiesFromAgent.length > 0 ? propertiesFromAgent : propertyState.properties}
+                    />
                   )}
                 </div>
               </div>

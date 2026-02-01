@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ExternalLink, MapPin, Bed, Bath, Square, Loader2, School, Hospital, Train, ShoppingCart, Search, SlidersHorizontal } from "lucide-react";
+import { MapPin, Bed, Bath, Square, Loader2, School, Hospital, Train, ShoppingCart, Sofa } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface PropertyFinderProperty {
@@ -15,6 +15,7 @@ interface PropertyFinderProperty {
   location: string;
   beds: number;
   baths: number;
+  livingRooms?: number;
   sqft: number;
   url: string;
   imageUrl?: string;
@@ -29,14 +30,15 @@ interface PropertyFinderViewProps {
   properties?: PropertyFinderProperty[];
   isLoading?: boolean;
   error?: string | null;
+  forcedFilterType?: "all" | "rent" | "sale";
 }
 
-export function PropertyListView({ properties = [], isLoading = false, error = null }: PropertyListViewProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "rent" | "sale">("all");
+export function PropertyListView({ properties = [], isLoading = false, error = null, forcedFilterType }: PropertyFinderViewProps) {
+  // Use parent-controlled type filter only
+  const filterType = forcedFilterType ?? "all";
   const [minBeds, setMinBeds] = useState<number>(0);
   const [maxPrice, setMaxPrice] = useState<number>(0);
-  const [showFilters, setShowFilters] = useState(false);
+  // No internal toggle or search bar; filters are always visible
 
   const formatPrice = (price: number, type: "sale" | "rent") => {
     if (type === "sale") {
@@ -45,18 +47,9 @@ export function PropertyListView({ properties = [], isLoading = false, error = n
     return `£${price.toLocaleString()}/mo`;
   };
 
-  // Filter and search properties
+  // Filter properties
   const filteredProperties = useMemo(() => {
-    return properties.filter(property => {
-      // Search filter
-      if (searchQuery) {
-        const searchLower = searchQuery.toLowerCase();
-        const matchesSearch = 
-          property.title.toLowerCase().includes(searchLower) ||
-          property.location.toLowerCase().includes(searchLower);
-        if (!matchesSearch) return false;
-      }
-      
+    return properties.filter((property: PropertyFinderProperty) => {
       // Type filter
       if (filterType !== "all" && property.type !== filterType) {
         return false;
@@ -74,7 +67,7 @@ export function PropertyListView({ properties = [], isLoading = false, error = n
       
       return true;
     });
-  }, [properties, searchQuery, filterType, minBeds, maxPrice]);
+  }, [properties, filterType, minBeds, maxPrice]);
 
   const getAmenityIcon = (type: string) => {
     const lowerType = type.toLowerCase();
@@ -91,6 +84,61 @@ export function PropertyListView({ properties = [], isLoading = false, error = n
       return <ShoppingCart className="h-3 w-3" />;
     }
     return <MapPin className="h-3 w-3" />;
+  };
+
+  const FloorPlan: React.FC<{ beds: number; baths: number; livingRooms?: number }> = ({ beds, baths, livingRooms = 1 }) => {
+    const rooms: Array<{ type: "bed" | "bath" | "living"; count: number; color: string }> = [
+      { type: "bed", count: Math.max(0, beds), color: "bg-blue-600" },
+      { type: "bath", count: Math.max(0, baths), color: "bg-cyan-600" },
+      { type: "living", count: Math.max(0, livingRooms), color: "bg-violet-600" },
+    ];
+    const total = rooms.reduce((sum, r) => sum + r.count, 0) || 1;
+    // Adaptive square grid with no upper cap to avoid overlap
+    const gridCols = Math.max(2, Math.ceil(Math.sqrt(total)));
+    const totalSlots = gridCols * gridCols;
+
+    const renderIcon = (type: "bed" | "bath" | "living") => {
+      // Smaller icon footprint; do not alter box sizing
+      const common = "w-1/2 h-1/2 text-white";
+      if (type === "bed") return <Bed className={common} />;
+      if (type === "bath") return <Bath className={common} />;
+      return <Sofa className={common} />;
+    };
+
+    const icons = rooms.flatMap((r, idx) => (
+      Array.from({ length: r.count }).map((_, i) => (
+        <div
+          key={`${r.type}-${idx}-${i}`}
+          className={`${r.color} flex items-center justify-center overflow-hidden`}
+          style={{ aspectRatio: "1 / 1" }}
+        >
+          <div className="flex items-center justify-center w-full h-full">
+            {renderIcon(r.type)}
+          </div>
+        </div>
+      ))
+    ));
+
+    return (
+      <div className="mt-3 p-0 border rounded-lg bg-muted/20">
+        <div className="relative w-full" style={{ aspectRatio: "1 / 1" }}>
+          <div
+            className="absolute inset-0 grid gap-0"
+            style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${gridCols}, minmax(0, 1fr))` }}
+          >
+            {icons}
+            {Array.from({ length: Math.max(0, totalSlots - total) }).map((_, i) => (
+              <div key={`empty-${i}`} style={{ aspectRatio: "1 / 1" }} />
+            ))}
+          </div>
+        </div>
+        <div className="mt-2 flex gap-3 text-[10px] text-muted-foreground px-2 pb-2">
+          <span>Bedrooms: {beds}</span>
+          <span>Bathrooms: {baths}</span>
+          <span>Living rooms: {Math.max(0, livingRooms)}</span>
+        </div>
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -136,69 +184,32 @@ export function PropertyListView({ properties = [], isLoading = false, error = n
 
   return (
     <div className="space-y-3">
-      {/* Search and Filter Bar */}
+      {/* Filters (always visible, no extra click) */}
       <div className="space-y-2 pb-2 border-b">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <div className="grid grid-cols-2 gap-2 pt-2">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Min Beds</label>
             <Input
-              type="text"
-              placeholder="Search by address or location..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9"
+              type="number"
+              min="0"
+              value={minBeds || ""}
+              onChange={(e) => setMinBeds(parseInt(e.target.value) || 0)}
+              placeholder="Any"
+              className="h-8 text-xs"
             />
           </div>
-          <Button
-            variant={showFilters ? "secondary" : "outline"}
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className="h-9 px-3"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-          </Button>
-        </div>
-        
-        {/* Filter Options */}
-        {showFilters && (
-          <div className="grid grid-cols-3 gap-2 pt-2">
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Type</label>
-              <select
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value as any)}
-                className="w-full h-8 px-2 text-xs border rounded-md bg-background"
-              >
-                <option value="all">All</option>
-                <option value="rent">Rent</option>
-                <option value="sale">Sale</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Min Beds</label>
-              <Input
-                type="number"
-                min="0"
-                value={minBeds || ""}
-                onChange={(e) => setMinBeds(parseInt(e.target.value) || 0)}
-                placeholder="Any"
-                className="h-8 text-xs"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground mb-1 block">Max Price</label>
-              <Input
-                type="number"
-                min="0"
-                value={maxPrice || ""}
-                onChange={(e) => setMaxPrice(parseInt(e.target.value) || 0)}
-                placeholder="Any"
-                className="h-8 text-xs"
-              />
-            </div>
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">Max Price</label>
+            <Input
+              type="number"
+              min="0"
+              value={maxPrice || ""}
+              onChange={(e) => setMaxPrice(parseInt(e.target.value) || 0)}
+              placeholder="Any"
+              className="h-8 text-xs"
+            />
           </div>
-        )}
-        
+        </div>
         {/* Results Count */}
         <div className="text-xs text-muted-foreground">
           Showing {filteredProperties.length} of {properties.length} {properties.length === 1 ? 'property' : 'properties'}
@@ -213,8 +224,6 @@ export function PropertyListView({ properties = [], isLoading = false, error = n
             variant="link"
             size="sm"
             onClick={() => {
-              setSearchQuery("");
-              setFilterType("all");
               setMinBeds(0);
               setMaxPrice(0);
             }}
@@ -225,59 +234,39 @@ export function PropertyListView({ properties = [], isLoading = false, error = n
         </div>
       )}
 
-      {/* Property Cards */}
-      {filteredProperties.map((property) => (
+      {/* Property Cards Gallery */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      {filteredProperties.map((property: PropertyFinderProperty) => (
         <Card key={property.id} className="p-4 hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start mb-3">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-semibold text-sm">{property.title}</h3>
-                <Badge variant={property.type === "sale" ? "default" : "secondary"} className="text-xs">
-                  {property.type === "sale" ? "For Sale" : "To Rent"}
-                </Badge>
-              </div>
+              <h3 className="font-semibold text-sm mb-1">{property.title}</h3>
             </div>
-            <div className="flex items-center justify-between mt-2">
+            <div className="flex flex-col items-end mt-1">
               <div className="font-bold text-lg">{formatPrice(property.price, property.type)}</div>
-              <a
-                href={property.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-              >
-                View Listing
-                <ExternalLink className="h-3 w-3" />
-              </a>
-            </div>
-            {/* Placeholder for reviews */}
-            <div className="mt-2 text-xs text-muted-foreground">
-              <span>Reviews: </span>
-              <span className="italic">(No reviews yet)</span>
+              <Badge variant={property.type === "sale" ? "default" : "secondary"} className="text-[10px] mt-1">
+                {property.type === "sale" ? "For Sale" : "To Rent"}
+              </Badge>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-xs text-muted-foreground mb-3">
-            <div className="flex items-center gap-1">
-              <Bed className="h-3 w-3" />
-              <span>{property.beds} beds</span>
+          {/* Removed duplicate bed/bath counters; keep sqft only if available */}
+          {property.sqft > 0 && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+              <Square className="h-3 w-3" />
+              <span>{property.sqft} sqft</span>
             </div>
-            <div className="flex items-center gap-1">
-              <Bath className="h-3 w-3" />
-              <span>{property.baths} baths</span>
-            </div>
-            {property.sqft > 0 && (
-              <div className="flex items-center gap-1">
-                <Square className="h-3 w-3" />
-                <span>{property.sqft} sqft</span>
-              </div>
-            )}
-          </div>
+          )}
 
-          {property.amenities && property.amenities.length > 0 && (
-            <div className="mb-3 pb-3 border-t pt-3">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Nearby Amenities</p>
+          {/* Floorplan visualization */}
+          <FloorPlan beds={property.beds} baths={property.baths} livingRooms={property.livingRooms ?? 1} />
+
+          {/* Nearby amenities section (always present) */}
+          <div className="mt-3 pt-3 border-t">
+            <p className="text-xs font-medium text-muted-foreground mb-2">Nearby Amenities</p>
+            {property.amenities && property.amenities.length > 0 ? (
               <div className="grid grid-cols-1 gap-2">
-                {property.amenities.slice(0, 3).map((amenity, idx) => (
+                {property.amenities.map((amenity: { type: string; name: string; distance: number }, idx: number) => (
                   <div key={idx} className="flex items-center gap-2 text-xs">
                     {getAmenityIcon(amenity.type)}
                     <span className="flex-1 truncate">{amenity.name}</span>
@@ -289,20 +278,13 @@ export function PropertyListView({ properties = [], isLoading = false, error = n
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          <a
-            href={property.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-          >
-            View Listing
-            <ExternalLink className="h-3 w-3" />
-          </a>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">Amenities data not available for this listing.</p>
+            )}
+          </div>
         </Card>
       ))}
+      </div>
     </div>
   );
 }
