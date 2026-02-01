@@ -329,7 +329,7 @@ export default function Home() {
                         />
                         
                         {/* Main Insights */}
-                        <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-1 border-2 border-blue-200 dark:border-blue-800/50 shadow-lg">
+                        <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-1 border border-border shadow-lg">
                           <A2UIRenderer state={filterA2UIByPath('prediction')} />
                         </div>
                         
@@ -349,8 +349,8 @@ export default function Home() {
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     <div className="text-center px-8 py-12 max-w-md">
-                      <div className="w-20 h-20 mx-auto mb-6 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                        <BarChart3 className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+                      <div className="w-20 h-20 mx-auto mb-6 bg-muted rounded-full flex items-center justify-center">
+                        <BarChart3 className="w-10 h-10 text-foreground" />
                       </div>
                       <h3 className="text-lg font-semibold mb-2">Insights Panel</h3>
                       <p className="text-sm text-muted-foreground">
@@ -448,11 +448,11 @@ export default function Home() {
             
             {/* Sustainability Assessment Page */}
             {sidebarMode === "sustainability" && (
-              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-violet-50 via-background to-purple-50 dark:from-violet-950/20 dark:via-background dark:to-purple-950/20">
-                <div className="flex-shrink-0 p-4 border-b-2 border-violet-200 dark:border-violet-800 bg-violet-50/50 dark:bg-violet-950/30">
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
+                <div className="flex-shrink-0 p-4 border-b bg-card/50">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
-                      <LineChart className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                    <div className="p-2 bg-muted rounded-lg">
+                      <LineChart className="h-5 w-5 text-foreground" />
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-foreground">Sustainability Assessment</h2>
@@ -463,7 +463,7 @@ export default function Home() {
                 <div className="flex-1 overflow-y-auto p-6">
                   {hasA2UIContent ? (
                     <div className="space-y-6">
-                      <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-4 border-2 border-violet-200 dark:border-violet-800/50 shadow-lg">
+                      <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-4 border border-border shadow-lg">
                         <A2UIRenderer state={filterA2UIByPath('carbon')} />
                       </div>
                       <InsightsDisclaimer />
@@ -471,8 +471,8 @@ export default function Home() {
                   ) : (
                     <div className="h-full flex items-center justify-center">
                       <div className="text-center px-8 py-12 max-w-md">
-                        <div className="w-20 h-20 mx-auto mb-6 bg-violet-100 dark:bg-violet-900/30 rounded-full flex items-center justify-center">
-                          <LineChart className="w-10 h-10 text-violet-600 dark:text-violet-400" />
+                        <div className="w-20 h-20 mx-auto mb-6 bg-muted rounded-full flex items-center justify-center">
+                          <LineChart className="w-10 h-10 text-foreground" />
                         </div>
                         <h3 className="text-lg font-semibold mb-2">Sustainability Assessment</h3>
                         <p className="text-sm text-muted-foreground mb-4">
@@ -490,11 +490,11 @@ export default function Home() {
             
             {/* Investment Analysis Page */}
             {sidebarMode === "investment" && (
-              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-emerald-50 via-background to-green-50 dark:from-emerald-950/20 dark:via-background dark:to-green-950/20">
-                <div className="flex-shrink-0 p-4 border-b-2 border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30">
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
+                <div className="flex-shrink-0 p-4 border-b bg-card/50">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
-                      <Calculator className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    <div className="p-2 bg-muted rounded-lg">
+                      <Calculator className="h-5 w-5 text-foreground" />
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-foreground">Investment Analysis</h2>
@@ -505,7 +505,7 @@ export default function Home() {
                 <div className="flex-1 overflow-y-auto p-6">
                   {hasA2UIContent ? (
                     <div className="space-y-6">
-                      <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-4 border-2 border-emerald-200 dark:border-emerald-800/50 shadow-lg">
+                      <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-4 border border-border shadow-lg">
                         <A2UIRenderer state={filterA2UIByPath('investment')} />
                       </div>
                       <InsightsDisclaimer />
@@ -531,8 +531,8 @@ export default function Home() {
                   ) : (
                     <div className="h-full flex items-center justify-center">
                       <div className="text-center px-8 py-12 max-w-md">
-                        <div className="w-20 h-20 mx-auto mb-6 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
-                          <Calculator className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+                        <div className="w-20 h-20 mx-auto mb-6 bg-muted rounded-full flex items-center justify-center">
+                          <Calculator className="w-10 h-10 text-foreground" />
                         </div>
                         <h3 className="text-lg font-semibold mb-2">Investment Calculator</h3>
                         <p className="text-sm text-muted-foreground mb-4">
