@@ -26,10 +26,17 @@ export function SummaryCard({
     spreadPct < 20 ? "High" : spreadPct < 35 ? "Moderate" : "Low";
   const confidenceColor =
     spreadPct < 20
-      ? "text-green-600 dark:text-green-400"
+      ? "text-green-700 dark:text-green-400"
       : spreadPct < 35
-      ? "text-yellow-600 dark:text-yellow-400"
+      ? "text-yellow-600 dark:text-yellow-300"
       : "text-red-600 dark:text-red-400";
+
+  const confidenceBarColor =
+    spreadPct < 20
+      ? "bg-green-400/80"
+      : spreadPct < 35
+      ? "bg-yellow-300/80"
+      : "bg-red-400/80";
 
   return (
     <div className="bg-card border border-border rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
@@ -89,7 +96,7 @@ export function SummaryCard({
           Confidence Level
         </span>
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${confidenceColor.includes('green') ? 'bg-green-500' : confidenceColor.includes('yellow') ? 'bg-yellow-500' : 'bg-red-500'}`}></div>
+          <div className={`w-3 h-3 rounded-full border-2 ${confidenceBarColor} border-white shadow`} />
           <span className={`text-sm font-semibold ${confidenceColor}`}>
             {confidenceLevel}
           </span>
@@ -97,16 +104,19 @@ export function SummaryCard({
       </div>
 
       {/* Visual range bar */}
-      <div className="relative h-4 bg-muted rounded-full overflow-hidden mb-6">
+      <div className="relative h-6 bg-muted rounded-full overflow-hidden mb-6 border border-border">
+        {/* Confidence range bar */}
         <div
-          className="absolute h-full bg-gradient-to-r from-primary/30 via-primary/60 to-primary/30 rounded-full"
+          className={`absolute h-full ${confidenceBarColor} rounded-full transition-all`}
           style={{
             left: `${((p10 - p10) / (p90 - p10)) * 100}%`,
-            right: `${100 - ((p90 - p10) / (p90 - p10)) * 100}%`,
+            width: `${((p90 - p10) / (p90 - p10)) * 100}%`,
+            opacity: 0.85,
           }}
         />
+        {/* Median marker */}
         <div
-          className="absolute h-full w-1 bg-primary shadow-md"
+          className="absolute h-full w-1.5 bg-primary shadow-md rounded"
           style={{
             left: `${((p50 - p10) / (p90 - p10)) * 100}%`,
           }}

@@ -4,21 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-interface Property {
-  id: string;
-  title: string;
-  price: number;
-  type: "sale" | "rent";
-  location: string;
-  beds: number;
-  baths: number;
-  sqft: number;
-  url: string;
-  imageUrl?: string;
-}
+
+import type { PropertyFinderProperty } from "@/components/PropertyListView";
 
 interface PropertyListingsState {
-  properties: Property[];
+  properties: PropertyFinderProperty[];
   isLoading: boolean;
   error: string | null;
   areaCode: string | null;

@@ -5,7 +5,7 @@ import { useChatStream } from "@/hooks/useChatStream";
 import { usePropertyListings } from "@/hooks/usePropertyListings";
 import { ChatPanel } from "@/components/ChatPanel";
 import { A2UIRenderer } from "@/components/A2UIRenderer";
-import { PropertyListView } from "@/components/PropertyListView";
+import { PropertyFinderView } from "@/components/PropertyListView";
 import { PropertyMapView } from "@/components/PropertyMapView";
 import { InsightsActions } from "@/components/InsightsActions";
 import { InsightsDisclaimer } from "@/components/InsightsDisclaimer";
@@ -152,7 +152,7 @@ export default function Home() {
                 <Search className="h-4 w-4" />
               </Button>
             </Tooltip>
-            <Tooltip content="Property Listings" side="right">
+            <Tooltip content="Property Finder" side="right">
               <Button
                 variant={sidebarMode === "properties" ? "secondary" : "ghost"}
                 size="icon"
@@ -287,15 +287,15 @@ export default function Home() {
               </div>
             )}
             
-            {/* Property Listings Page */}
+            {/* Property Finder Page */}
             {sidebarMode === "properties" && (
               <div className="h-full flex flex-col bg-muted/30">
                 {/* View Toggle */}
                 <div className="flex-shrink-0 border-b px-4 py-3 bg-card/50">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-lg font-semibold text-foreground">Property Listings</h2>
-                      <p className="text-xs text-muted-foreground">Available properties in your area</p>
+                      <h2 className="text-lg font-semibold text-foreground">Property Finder</h2>
+                      <p className="text-xs text-muted-foreground">Find properties with images, links, and reviews</p>
                     </div>
                     <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                       <Button
@@ -323,7 +323,7 @@ export default function Home() {
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4">
                   {viewMode === "list" ? (
-                    <PropertyListView 
+                    <PropertyFinderView 
                       properties={propertyState.properties}
                       isLoading={propertyState.isLoading}
                       error={propertyState.error}
