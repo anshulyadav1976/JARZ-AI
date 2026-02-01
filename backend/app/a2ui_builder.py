@@ -48,6 +48,50 @@ def build_text_component(
     return {"id": id, "component": component}
 
 
+def build_card_component(
+    card_id: str,
+    title: str,
+    items: list[dict],
+    variant: str = "default",
+) -> dict:
+    """
+    Build a generic card component for displaying key-value pairs.
+    
+    Args:
+        card_id: Unique ID for the card
+        title: Card title
+        items: List of dicts with 'label', 'value', and optional 'highlight' keys
+        variant: Card style variant (default, primary, success, destructive)
+    
+    Returns:
+        A2UI component dict
+    """
+    # Build text component with structured content
+    # Format as a clean table-like display
+    content_lines = [f"**{title}**", ""]
+    
+    for item in items:
+        label = item.get("label", "")
+        value = item.get("value", "")
+        highlight = item.get("highlight", False)
+        
+        if highlight:
+            content_lines.append(f"**{label}:** *{value}*")
+        else:
+            content_lines.append(f"{label}: {value}")
+    
+    content = "\n".join(content_lines)
+    
+    component = {
+        "Text": {
+            "text": _literal_string(content),
+            "usageHint": "body"
+        }
+    }
+    
+    return {"id": card_id, "component": component}
+
+
 def build_column_component(id: str, children: list[str]) -> dict:
     """Build A2UI Column component."""
     return {
@@ -72,18 +116,6 @@ def build_row_component(
             "Row": {
                 "alignment": alignment,
                 "children": {"explicitList": children}
-            }
-        }
-    }
-
-
-def build_card_component(id: str, child: str) -> dict:
-    """Build A2UI Card component."""
-    return {
-        "id": id,
-        "component": {
-            "Card": {
-                "child": child
             }
         }
     }
@@ -475,6 +507,18 @@ def build_complete_ui(
         {"key": "drivers", "valueArray": driver_data},
     ], path="/explanation"))
     
+    # Prediction data for auto-switching and investment calculator
+    messages.append(build_data_model_update([
+        {"key": "p50", "valueNumber": prediction.p50},
+        {"key": "p10", "valueNumber": prediction.p10},
+        {"key": "p90", "valueNumber": prediction.p90},
+    ], path="/prediction"))
+    
+    # Location data
+    messages.append(build_data_model_update([
+        {"key": "location", "valueString": location.display_name or location.area_code},
+    ], path="/"))
+    
     # Begin rendering
     messages.append(build_begin_rendering("root"))
     
@@ -484,3 +528,200 @@ def build_complete_ui(
 def messages_to_jsonl(messages: list[dict]) -> str:
     """Convert messages to JSONL string."""
     return "\n".join(json.dumps(m) for m in messages)
+
+
+def build_listings_cards(
+    rent_listings: list[dict],
+    sale_listings: list[dict],
+    amenities_by_postcode: Optional[dict],
+    location: str,
+) -> list[dict]:
+    """
+    Build A2UI messages for property listings with amenities.
+    
+    Args:
+        rent_listings: List of rent listing dicts from ScanSan API
+        sale_listings: List of sale listing dicts from ScanSan API
+        amenities_by_postcode: Optional dict mapping postcodes to amenity lists
+        location: Location name/description
+        
+    Returns:
+        List of A2UI messages
+    """
+    messages = []
+    all_components = []
+    
+    # Combine all listings
+    all_listings = []
+    
+    # Log first listing to see available fields
+    if rent_listings and len(rent_listings) > 0:
+        print(f"[A2UI] Sample rent listing fields: {list(rent_listings[0].keys())}")
+        print(f"[A2UI] Sample rent listing data: {rent_listings[0]}")
+    if sale_listings and len(sale_listings) > 0:
+        print(f"[A2UI] Sample sale listing fields: {list(sale_listings[0].keys())}")
+        print(f"[A2UI] Sample sale listing data: {sale_listings[0]}")
+    
+    for listing in rent_listings:
+        postcode = listing.get("area_code", "")
+        property_amenities = []
+        
+        # Get amenities for this specific property's postcode
+        if amenities_by_postcode and postcode in amenities_by_postcode:
+            property_amenities = amenities_by_postcode[postcode]
+        
+        # Get URL from listing data (listing_url field from ScanSan API)
+        url = listing.get("listing_url") or "#"
+        
+        # Extract location - try to find postcode in street address or use area name
+        street_address = listing.get("street_address", "Unknown Address")
+        # UK postcode pattern at end of string
+        import re
+        postcode_match = re.search(r'\b([A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2})\b', street_address)
+        if postcode_match:
+            display_location = postcode_match.group(1)
+        else:
+            # Use the area name passed to this function instead of district code
+            display_location = location
+        
+        # Get URL from listing data (listing_url field from ScanSan API)
+        url = listing.get("listing_url") or "#"
+        
+        # Get property size and convert to sqft if needed
+        property_size = listing.get("property_size")
+        size_metric = listing.get("property_size_metric")
+        sqft = 0
+        
+        if property_size:
+            try:
+                # Convert string to float
+                size_value = float(property_size)
+                
+                if size_metric == "sqm" or size_metric == "sq_m":
+                    # Convert square meters to square feet (1 sqm = 10.764 sqft)
+                    sqft = int(size_value * 10.764)
+                elif size_metric == "sqft" or size_metric == "sq_ft":
+                    sqft = int(size_value)
+                else:
+                    # Assume sqft if no metric specified
+                    sqft = int(size_value)
+            except (ValueError, TypeError):
+                sqft = 0
+        
+        all_listings.append({
+            "id": f"rent_{listing.get('street_address', '')}_{listing.get('rent_pcm', 0)}",
+            "title": street_address,
+            "price": listing.get("rent_pcm", 0),
+            "type": "rent",
+            "location": display_location,
+            "beds": listing.get("bedrooms", 0) or 0,
+            "baths": listing.get("bathrooms", 0) or 0,
+            "sqft": sqft,
+            "url": url,
+            "amenities": property_amenities,
+        })
+    
+    for listing in sale_listings:
+        postcode = listing.get("area_code", "")
+        property_amenities = []
+        
+        # Get amenities for this specific property's postcode
+        if amenities_by_postcode and postcode in amenities_by_postcode:
+            property_amenities = amenities_by_postcode[postcode]
+        
+        # Get URL from listing data (listing_url field from ScanSan API)
+        url = listing.get("listing_url") or "#"
+        
+        # Extract location - try to find postcode in street address or use area name
+        street_address = listing.get("street_address", "Unknown Address")
+        # UK postcode pattern at end of string
+        import re
+        postcode_match = re.search(r'\b([A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2})\b', street_address)
+        if postcode_match:
+            display_location = postcode_match.group(1)
+        else:
+            # Use the area name passed to this function instead of district code
+            display_location = location
+        
+        # Get URL from listing data (listing_url field from ScanSan API)
+        url = listing.get("listing_url") or "#"
+        
+        # Get property size and convert to sqft if needed
+        property_size = listing.get("property_size")
+        size_metric = listing.get("property_size_metric")
+        sqft = 0
+        
+        if property_size:
+            try:
+                # Convert string to float
+                size_value = float(property_size)
+                
+                if size_metric == "sqm" or size_metric == "sq_m":
+                    # Convert square meters to square feet (1 sqm = 10.764 sqft)
+                    sqft = int(size_value * 10.764)
+                elif size_metric == "sqft" or size_metric == "sq_ft":
+                    sqft = int(size_value)
+                else:
+                    # Assume sqft if no metric specified
+                    sqft = int(size_value)
+            except (ValueError, TypeError):
+                sqft = 0
+        
+        all_listings.append({
+            "id": f"sale_{listing.get('street_address', '')}_{listing.get('sale_price', 0)}",
+            "title": street_address,
+            "price": listing.get("sale_price", 0),
+            "type": "sale",
+            "location": display_location,
+            "beds": listing.get("bedrooms", 0) or 0,
+            "baths": listing.get("bathrooms", 0) or 0,
+            "sqft": sqft,
+            "url": url,
+            "amenities": property_amenities,
+        })
+    
+    # Build header
+    all_components.append(build_text_component(
+        "listings_header",
+        f"Property Listings in {location}",
+        usage_hint="heading1"
+    ))
+    
+    # Build detailed summary text
+    rent_count = len(rent_listings)
+    sale_count = len(sale_listings)
+    total_count = rent_count + sale_count
+    
+    summary_parts = []
+    if rent_count > 0:
+        summary_parts.append(f"**{rent_count}** {'property' if rent_count == 1 else 'properties'} available for rent")
+    if sale_count > 0:
+        summary_parts.append(f"**{sale_count}** {'property' if sale_count == 1 else 'properties'} for sale")
+    
+    summary_text = f"I found {summary_parts[0]}"
+    if len(summary_parts) == 2:
+        summary_text = f"I found {summary_parts[0]} and {summary_parts[1]}"
+    summary_text += f" in {location}."
+    
+    if amenities_by_postcode:
+        summary_text += " Each property listing includes nearby amenities such as schools, transport, and shops."
+    
+    all_components.append(build_text_component(
+        "listings_summary",
+        summary_text,
+        usage_hint="body"
+    ))
+    
+    # Surface update with components
+    messages.append(build_surface_update(all_components))
+    
+    # Data model updates for listings (amenities are now embedded in each property)
+    messages.append(build_data_model_update([
+        {"key": "properties", "valueArray": all_listings},
+    ], path="/listings"))
+    
+    # Begin rendering
+    messages.append(build_begin_rendering("root"))
+    
+    return messages
+

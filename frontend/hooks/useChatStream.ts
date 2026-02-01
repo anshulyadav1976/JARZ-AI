@@ -166,7 +166,11 @@ export function useChatStream(): UseChatStreamResult {
         error: null,
         streamingContent: "",
         currentTool: null,
-        // Clear A2UI state for new query (keep showing until new results come in)
+        // Clear A2UI data model for new query (but keep UI showing until new results come in)
+        a2uiState: {
+          ...prev.a2uiState,
+          dataModel: {}, // Clear previous tool data
+        },
       }));
 
       // Add to history

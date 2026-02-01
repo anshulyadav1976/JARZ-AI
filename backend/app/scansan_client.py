@@ -330,6 +330,181 @@ class ScanSanClient:
         
         print(f"[SCANSAN] No UPRN found for postcode: {postcode}")
         return None
+    
+    async def get_crime_summary(self, area_code: str) -> Optional[dict]:
+        """Get crime summary for area code."""
+        print(f"[SCANSAN] GET /v1/area_codes/{area_code}/crime/summary")
+        data = await self._request("GET", f"/v1/area_codes/{area_code}/crime/summary")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Crime summary found for {area_code}")
+            return data
+        
+        print(f"[SCANSAN] No crime summary found for {area_code}")
+        return None
+    
+    async def get_crime_detail(self, area_code: str) -> Optional[dict]:
+        """Get detailed crime data for area code."""
+        print(f"[SCANSAN] GET /v1/area_codes/{area_code}/crime/detail")
+        data = await self._request("GET", f"/v1/area_codes/{area_code}/crime/detail")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Crime detail found for {area_code}: {len(data['data'])} incidents")
+            return data
+        
+        print(f"[SCANSAN] No crime detail found for {area_code}")
+        return None
+    
+    async def get_sale_demand(
+        self,
+        district: str,
+        period: Optional[str] = None,
+        additional_data: bool = False,
+    ) -> Optional[dict]:
+        """Get sales demand data for district."""
+        params = {}
+        if period:
+            params["period"] = period
+        if additional_data:
+            params["additional_data"] = additional_data
+        
+        print(f"[SCANSAN] GET /v1/district/{district}/sale/demand")
+        data = await self._request("GET", f"/v1/district/{district}/sale/demand", params)
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Sale demand data found for {district}")
+            return data
+        
+        print(f"[SCANSAN] No sale demand data found for {district}")
+        return None
+    
+    async def get_sale_history(self, postcode: str) -> Optional[dict]:
+        """Get sale history for properties on given postcode."""
+        clean_postcode = postcode.replace(" ", "").upper()
+        print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/sale/history")
+        data = await self._request("GET", f"/v1/postcode/{clean_postcode}/sale/history")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Sale history found: {len(data['data'])} properties")
+            return data
+        
+        print(f"[SCANSAN] No sale history found for {postcode}")
+        return None
+    
+    async def get_classification(self, postcode: str) -> Optional[dict]:
+        """Get classification data for postcode."""
+        clean_postcode = postcode.replace(" ", "").upper()
+        print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/classification")
+        data = await self._request("GET", f"/v1/postcode/{clean_postcode}/classification")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Classification data found for {postcode}")
+            return data
+        
+        print(f"[SCANSAN] No classification data found for {postcode}")
+        return None
+    
+    async def get_regeneration(self, postcode: str) -> Optional[dict]:
+        """Get regeneration data for postcode."""
+        clean_postcode = postcode.replace(" ", "").upper()
+        print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/regeneration")
+        data = await self._request("GET", f"/v1/postcode/{clean_postcode}/regeneration")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Regeneration data found for {postcode}")
+            return data
+        
+        print(f"[SCANSAN] No regeneration data found for {postcode}")
+        return None
+    
+    async def get_current_valuations(self, postcode: str) -> Optional[dict]:
+        """Get current valuations for properties in postcode."""
+        clean_postcode = postcode.replace(" ", "").upper()
+        print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/valuations/current")
+        data = await self._request("GET", f"/v1/postcode/{clean_postcode}/valuations/current")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Current valuations found: {len(data['data'])} properties")
+            return data
+        
+        print(f"[SCANSAN] No current valuations found for {postcode}")
+        return None
+    
+    async def get_historical_valuations(self, postcode: str) -> Optional[dict]:
+        """Get historical valuations for properties in postcode."""
+        clean_postcode = postcode.replace(" ", "").upper()
+        print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/valuations/historical")
+        data = await self._request("GET", f"/v1/postcode/{clean_postcode}/valuations/historical")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Historical valuations found: {len(data['data'])} properties")
+            return data
+        
+        print(f"[SCANSAN] No historical valuations found for {postcode}")
+        return None
+    
+    async def get_census(self, postcode: str) -> Optional[dict]:
+        """Get census data for postcode."""
+        clean_postcode = postcode.replace(" ", "").upper()
+        print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/census")
+        data = await self._request("GET", f"/v1/postcode/{clean_postcode}/census")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Census data found for {postcode}")
+            return data
+        
+        print(f"[SCANSAN] No census data found for {postcode}")
+        return None
+    
+    async def get_amenities(self, postcode: str) -> Optional[dict]:
+        """Get nearest amenities for postcode."""
+        clean_postcode = postcode.replace(" ", "").upper()
+        print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/amenities")
+        data = await self._request("GET", f"/v1/postcode/{clean_postcode}/amenities")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Amenities data found for {postcode}")
+            return data
+        
+        print(f"[SCANSAN] No amenities data found for {postcode}")
+        return None
+    
+    async def get_lha(self, postcode: str) -> Optional[dict]:
+        """Get Local Housing Allowance (LHA) data for postcode."""
+        clean_postcode = postcode.replace(" ", "").upper()
+        print(f"[SCANSAN] GET /v1/postcode/{clean_postcode}/lha")
+        data = await self._request("GET", f"/v1/postcode/{clean_postcode}/lha")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] LHA data found for {postcode}")
+            return data
+        
+        print(f"[SCANSAN] No LHA data found for {postcode}")
+        return None
+    
+    async def get_planning_permission(self, uprn: str) -> Optional[dict]:
+        """Get planning permission data for property by UPRN."""
+        print(f"[SCANSAN] GET /v1/property/{uprn}/planning_permission")
+        data = await self._request("GET", f"/v1/property/{uprn}/planning_permission")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Planning permission data found for UPRN {uprn}")
+            return data
+        
+        print(f"[SCANSAN] No planning permission data found for UPRN {uprn}")
+        return None
+    
+    async def get_property_addresses(self, uprn: str) -> Optional[dict]:
+        """Get addresses for property by UPRN."""
+        print(f"[SCANSAN] GET /v1/property/{uprn}/addresses")
+        data = await self._request("GET", f"/v1/property/{uprn}/addresses")
+        
+        if data and "data" in data:
+            print(f"[SCANSAN] Address data found for UPRN {uprn}")
+            return data
+        
+        print(f"[SCANSAN] No address data found for UPRN {uprn}")
+        return None
 
 
 # Singleton client
