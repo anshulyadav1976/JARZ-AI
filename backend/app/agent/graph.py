@@ -292,6 +292,8 @@ async def stream_chat_agent(
     # Stream through the graph (each node's stream_output is that node's output only)
     async for event in graph.astream(initial_state):
         for node_name, node_output in event.items():
+            print(f"[GRAPH] Processing node: {node_name}, status: {node_output.get('status')}")
+            
             # Yield node info
             yield {
                 "type": "node",
@@ -301,7 +303,9 @@ async def stream_chat_agent(
             
             # Yield all stream output from this node (per-node, not cumulative)
             stream_output = node_output.get("stream_output", [])
-            for item in stream_output:
+            print(f"[GRAPH] Node {node_name} has {len(stream_output)} stream_output items")
+            for i, item in enumerate(stream_output):
+                print(f"[GRAPH] Yielding stream_output item {i}: type={item.get('type')}, content_len={len(item.get('content', ''))}")
                 yield item
             
             # Yield error if present

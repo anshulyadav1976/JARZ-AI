@@ -28,9 +28,13 @@ interface PropertyMapViewProps {
   center?: [number, number];
 }
 
-// Dynamically import the map component with SSR disabled
-const PropertyMapViewClient = dynamic(
-  () => import('./PropertyMapViewClient').then(mod => ({ default: mod.PropertyMapViewClient })),
+// Choose between Mapbox client or placeholder at build time based on token presence
+const MAPBOX_ENABLED = !!process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+
+const PropertyMapComponent = dynamic(
+  () => MAPBOX_ENABLED
+    ? import('./PropertyMapViewClient').then(mod => ({ default: mod.PropertyMapViewClient }))
+    : import('./PropertyMapPlaceholder').then(mod => ({ default: mod.PropertyMapPlaceholder })),
   {
     ssr: false,
     loading: () => (
@@ -45,5 +49,5 @@ const PropertyMapViewClient = dynamic(
 );
 
 export function PropertyMapView({ properties = [], center }: PropertyMapViewProps) {
-  return <PropertyMapViewClient properties={properties} center={center} />;
+  return <PropertyMapComponent properties={properties} center={center} />;
 }

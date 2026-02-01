@@ -219,6 +219,9 @@ TOOL SELECTION RULES (follow strictly):
    - "What's for rent/sale in X?"
    - "Show me properties in Y"
    - "Find listings in Z"
+   - "What is rent listing in X?"
+   - "Show me rent listings..."
+   - "Available rentals in..."
    
 3. Investment/ROI Questions → get_investment_analysis
    - "What's my ROI if I buy..."

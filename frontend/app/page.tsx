@@ -11,10 +11,11 @@ import { InsightsActions } from "@/components/InsightsActions";
 import { InsightsDisclaimer } from "@/components/InsightsDisclaimer";
 import { ComparisonMode } from "@/components/ComparisonMode";
 import { InvestmentCalculator } from "@/components/InvestmentCalculator";
+import { InvestmentAnalysisView } from "@/components/InvestmentAnalysisView";
 import { Tooltip } from "@/components/ui/tooltip-custom";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { BarChart3, Home as HomeIcon, User, TrendingUp, Home as Building, List, Map, Calculator, LineChart, Sparkles, ArrowLeftRight, Database, MessageSquarePlus, UserCircle, Menu } from "lucide-react";
+import { BarChart3, Home as HomeIcon, User, UserCircle, MessageSquarePlus, Menu, Sparkles, ArrowLeftRight, Search, Leaf, Calculator, Database, LineChart, List, Map } from "lucide-react";
 import { MarketDataPanel } from "@/components/MarketDataPanel";
 import {
   getProfile,
@@ -268,6 +269,19 @@ export default function Home() {
       }
     }
   }, [hasA2UIContent, autoSwitchEnabled, state.a2uiState.dataModel]);
+  
+  // Extract investment data for investment analysis view
+  const getInvestmentData = () => {
+    if (!hasA2UIContent) return null;
+    try {
+      const dataModel = state.a2uiState.dataModel as any;
+      return dataModel?.investment || null;
+    } catch {
+      return null;
+    }
+  };
+
+  const investmentData = getInvestmentData();
   
   // Extract prediction data for investment calculator
   const getPredictionData = () => {
@@ -528,7 +542,7 @@ export default function Home() {
                 onClick={() => handleManualSidebarChange("properties")}
                 className="w-10 h-10"
               >
-                <Building className="h-4 w-4" />
+                <Search className="h-4 w-4" />
               </Button>
             </Tooltip>
             <Tooltip content="Sustainability" side="right">
@@ -538,7 +552,7 @@ export default function Home() {
                 onClick={() => handleManualSidebarChange("sustainability")}
                 className="w-10 h-10"
               >
-                <LineChart className="h-4 w-4" />
+                <Leaf className="h-4 w-4" />
               </Button>
             </Tooltip>
             <Tooltip content="Investment Analysis" side="right">
@@ -631,6 +645,8 @@ export default function Home() {
                 )}
               </div>
             )}
+            
+            {/* Search & Filter Page removed */}
 
             {/* Market Data (Growth, Demand, Valuations, Sale History) */}
             {sidebarMode === "market" && (
@@ -837,7 +853,12 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto p-6">
-                  {hasA2UIContent ? (
+                  {investmentData ? (
+                    <InvestmentAnalysisView 
+                      data={investmentData}
+                      location={currentArea || "Unknown"}
+                    />
+                  ) : hasA2UIContent ? (
                     <div className="space-y-6">
                       <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-4 border border-border shadow-lg">
                         <A2UIRenderer state={filterA2UIByPath('investment')} />

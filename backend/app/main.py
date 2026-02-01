@@ -69,7 +69,12 @@ app = FastAPI(
 # CORS middleware for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -189,6 +194,56 @@ async def get_area_summary(area_code: str):
     client = get_scansan_client()
     summary = await client.get_area_summary(area_code)
     return summary
+
+# =============================================================================
+# Amenities API Endpoint
+# =============================================================================
+
+@app.get("/api/postcode/{area_code_postal}/amenities")
+async def get_amenities(area_code_postal: str):
+    """
+    Fetch nearest amenities for a given postcode or outward area code.
+
+    Accepts either a full postcode (e.g., "NW1 0BH") or an outward code (e.g., "NW1").
+    Returns a normalized list of amenities with type, name, and distance in miles.
+    """
+    try:
+        client = get_scansan_client()
+        data = await client.get_amenities(area_code_postal)
+        # Normalize shape to a flat list for frontend
+        amenities: list[dict] = []
+        if data and "data" in data:
+            raw = data["data"]
+            # Some ScanSan responses use nested arrays; flatten cautiously
+            if isinstance(raw, list):
+                for group in raw:
+                    if isinstance(group, list):
+                        for item in group:
+                            amenity_type = item.get("amenity_type") or item.get("type")
+                            name = item.get("name") or item.get("amenity_name")
+                            distance = item.get("distance_miles") or item.get("distance")
+                            if amenity_type and name is not None:
+                                amenities.append({
+                                    "type": str(amenity_type),
+                                    "name": str(name),
+                                    "distance": float(distance) if distance is not None else None,
+                                })
+            else:
+                # If data structure differs, attempt to map keys directly
+                for item in raw:
+                    amenity_type = item.get("amenity_type")
+                    name = item.get("name")
+                    distance = item.get("distance_miles")
+                    if amenity_type and name is not None:
+                        amenities.append({
+                            "type": str(amenity_type),
+                            "name": str(name),
+                            "distance": float(distance) if distance is not None else None,
+                        })
+
+        return {"success": True, "area_code_postal": area_code_postal, "amenities": amenities}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # =============================================================================
@@ -442,13 +497,15 @@ async def generate_chat_sse_events(
             
             elif event_type == "text":
                 content = event.get("content", "")
-                accumulated_text.append(content)
+                print(f"[SSE] Received text event, content length: {len(content)}, preview: {content[:100]}")
                 yield {
                     "event": "text",
                     "data": json.dumps({
                         "content": content,
                     }),
                 }
+                print(f"[SSE] Yielded text event")
+
             
             elif event_type == "tool_start":
                 yield {

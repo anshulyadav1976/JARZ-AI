@@ -397,7 +397,7 @@ export function useChatStream(options?: UseChatStreamOptions): UseChatStreamResu
 
             if (done) {
               // Finalize the message
-              if (accumulatedContent) {
+              if (accumulatedContent.trim()) {
                 const assistantMessage: Message = {
                   id: generateId(),
                   role: "assistant",

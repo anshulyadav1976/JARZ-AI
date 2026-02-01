@@ -135,7 +135,7 @@ class LLMClient:
             messages: Conversation history
             tools: Available tools/functions
             temperature: Sampling temperature
-            max_tokens: Maximum response tokens
+            max_tokens: Maximum response tokens (default: 16384)
             
         Returns:
             Assistant's response message
@@ -192,7 +192,7 @@ class LLMClient:
         messages: list[ChatMessage],
         tools: Optional[list[ToolDefinition]] = None,
         temperature: float = 0.7,
-        max_tokens: int = 200_000,
+        max_tokens: int = 32768,
     ) -> AsyncGenerator[StreamChunk, None]:
         """
         Streaming chat completion.
@@ -201,7 +201,7 @@ class LLMClient:
             messages: Conversation history
             tools: Available tools/functions
             temperature: Sampling temperature
-            max_tokens: Maximum response tokens
+            max_tokens: Maximum response tokens (default: 16384)
             
         Yields:
             StreamChunk objects with text or tool calls
