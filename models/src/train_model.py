@@ -7,19 +7,15 @@ import pickle
 import warnings
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+from sklearn.model_selection import train_test_split
 
 import numpy as np
 import pandas as pd
 import shap
 from scipy.spatial.distance import cdist
 from sklearn.metrics import mean_absolute_error, mean_squared_error
-
-try:
-    import lightgbm as lgb
-    USE_LIGHTGBM = True
-except ImportError:
-    from sklearn.ensemble import GradientBoostingRegressor
-    USE_LIGHTGBM = False
+import lightgbm as lgb
+USE_LIGHTGBM = True
 
 warnings.filterwarnings('ignore')
 
@@ -421,20 +417,35 @@ if __name__ == "__main__":
     
     print(f"\n📊 Target: {target_col} (n={df[target_col].notna().sum()}, mean=£{df[target_col].mean():.0f})")
     
-    # Train and evaluate
+    # Prepare features and target
     X, _ = prepare_features(df)
     y = df[target_col]
-    
-    artifact = train_quantile_model(X, y)
+
+    # Only use valid rows for splitting
+    valid = y.notna() & (y > 0)
+    X_valid, y_valid = X[valid], y[valid]
+
+    # Split into train/test sets (80/20 split)
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_valid, y_valid, test_size=0.2, random_state=42
+    )
+
+    # Train on train set only
+    artifact = train_quantile_model(X_train, y_train)
     artifact["neighbors"] = neighbor_details
-    metrics = evaluate_model(artifact, X, y)
-    shap_imp = compute_shap(artifact, X)
-    save_model(artifact, metrics, shap_imp)
-    
+
+    print("\n--- Train set evaluation ---")
+    train_metrics = evaluate_model(artifact, X_train, y_train)
+    print("\n--- Test set evaluation ---")
+    test_metrics = evaluate_model(artifact, X_test, y_test)
+
+    shap_imp = compute_shap(artifact, X_train)
+    save_model(artifact, test_metrics, shap_imp)
+
     # Demo
     print("\n" + "=" * 60)
     print("DEMO PREDICTION")
-    idx = df[target_col].notna().idxmax()
+    idx = X_test.index[0] if len(X_test) > 0 else X_train.index[0]
     pred = predict(artifact, X.loc[idx].to_dict())
     print(f"District: {df.loc[idx, 'district']}")
     print(f"Actual: £{y.loc[idx]:.0f} | Predicted: £{pred['p10']:.0f} - £{pred['p50']:.0f} - £{pred['p90']:.0f}")

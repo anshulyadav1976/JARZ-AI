@@ -411,7 +411,7 @@ export function A2UIRenderer({ state, onWhatIfChange }: A2UIRendererProps) {
     return null;
   }
 
-  console.log("[A2UIRenderer] Rendering component:", state.rootId);
+  // console.log("[A2UIRenderer] Rendering component:", state.rootId);
   
   return (
     <div className="w-full">

@@ -23,7 +23,7 @@ interface Property {
 }
 
 interface PropertyListingsState {
-  properties: PropertyFinderProperty[];
+  properties: any[];
   isLoading: boolean;
   error: string | null;
   areaCode: string | null;
@@ -32,6 +32,7 @@ interface PropertyListingsState {
 interface UsePropertyListingsResult {
   state: PropertyListingsState;
   fetchListings: (areaCode: string, listingType: "rent" | "sale") => Promise<void>;
+  fetchListingsBoth: (areaCode: string) => Promise<void>;
 }
 
 export function usePropertyListings(): UsePropertyListingsResult {
@@ -62,9 +63,33 @@ export function usePropertyListings(): UsePropertyListingsResult {
       }
 
       const result = await response.json();
-      
+
       if (result.success && result.data) {
-        const listings = result.data.listings || [];
+        const apiData = result.data;
+        const dataSection = apiData?.data || {};
+        const listingsRaw = (listingType === "sale")
+          ? (dataSection?.sale_listings || [])
+          : (dataSection?.rent_listings || []);
+
+        const listings = (listingsRaw as any[]).map((item: any, idx: number) => {
+          const price = listingType === "rent"
+            ? (item?.rent_pcm ?? (item?.rent_pw ? Math.round(item.rent_pw * 52 / 12) : 0))
+            : (item?.sale_price ?? 0);
+          const size = parseInt(item?.property_size, 10);
+          return {
+            id: `${item?.street_address || "unknown"}-${idx}`,
+            title: item?.street_address || `${item?.area_code_district || areaCode} property`,
+            price,
+            type: listingType,
+            location: item?.area_code_district || areaCode,
+            beds: item?.bedrooms ?? 0,
+            baths: item?.bathrooms ?? 0,
+            livingRooms: item?.living_rooms ?? 1,
+            sqft: Number.isFinite(size) ? size : 0,
+            url: "",
+          };
+        });
+
         setState({
           properties: listings,
           isLoading: false,
@@ -83,8 +108,70 @@ export function usePropertyListings(): UsePropertyListingsResult {
     }
   }, []);
 
+  const fetchListingsBoth = useCallback(async (areaCode: string) => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    try {
+      // Fetch rent
+      const rentResp = await fetch(`${API_URL}/api/properties/listings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ area_code: areaCode, listing_type: "rent" }),
+      });
+      const rentData = rentResp.ok ? await rentResp.json() : null;
+
+      // Fetch sale
+      const saleResp = await fetch(`${API_URL}/api/properties/listings`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ area_code: areaCode, listing_type: "sale" }),
+      });
+      const saleData = saleResp.ok ? await saleResp.json() : null;
+
+      const normalize = (result: any, listingType: "rent" | "sale") => {
+        if (!result?.success || !result?.data) return [];
+        const section = result.data?.data || {};
+        const raw = listingType === "sale" ? (section?.sale_listings || []) : (section?.rent_listings || []);
+        return (raw as any[]).map((item: any, idx: number) => {
+          const price = listingType === "rent" ? (item?.rent_pcm ?? (item?.rent_pw ? Math.round(item.rent_pw * 52 / 12) : 0)) : (item?.sale_price ?? 0);
+          const size = parseInt(item?.property_size, 10);
+          return {
+            id: `${item?.street_address || "unknown"}-${listingType}-${idx}`,
+            title: item?.street_address || `${item?.area_code_district || areaCode} property`,
+            price,
+            type: listingType,
+            location: item?.area_code_district || areaCode,
+            beds: item?.bedrooms ?? 0,
+            baths: item?.bathrooms ?? 0,
+            livingRooms: item?.living_rooms ?? 1,
+            sqft: Number.isFinite(size) ? size : 0,
+            url: "",
+          };
+        });
+      };
+
+      const combined = [
+        ...normalize(rentData, "rent"),
+        ...normalize(saleData, "sale"),
+      ];
+
+      setState({
+        properties: combined,
+        isLoading: false,
+        error: null,
+        areaCode: areaCode,
+      });
+    } catch (error) {
+      setState(prev => ({
+        ...prev,
+        isLoading: false,
+        error: error instanceof Error ? error.message : "Failed to fetch listings",
+      }));
+    }
+  }, []);
+
   return {
     state,
     fetchListings,
+    fetchListingsBoth,
   };
 }

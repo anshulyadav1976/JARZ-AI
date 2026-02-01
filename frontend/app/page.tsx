@@ -27,18 +27,12 @@ interface ConversationSummary {
 }
 
 export default function Home() {
-  const [marketTrigger, setMarketTrigger] = useState<{ district?: string | null; postcode?: string | null } | null>(null);
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const { state, sendMessage, reset, loadConversation, applyA2UIMessages } = useChatStream({
-    onMarketDataRequest: (data) => {
-      setSidebarMode("market");
-      setMarketTrigger({ district: data.district ?? null, postcode: data.postcode ?? null });
-    },
-  });
+  const { state, sendMessage, reset } = useChatStream();
   const { state: propertyState, fetchListings } = usePropertyListings();
   const [activeTab, setActiveTab] = useState("home");
   const [sidebarMode, setSidebarMode] = useState<"valuation" | "comparison" | "properties" | "sustainability" | "investment" | "market">("valuation");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [listingFilterType, setListingFilterType] = useState<"all" | "rent" | "sale">("all");
   const [comparedAreas, setComparedAreas] = useState<string[]>([]);
   const [savedAreas, setSavedAreas] = useState<string[]>([]);
   const [currentArea, setCurrentArea] = useState<string>("");
@@ -53,13 +47,15 @@ export default function Home() {
     if (areaCodeMatch) {
       const areaCode = areaCodeMatch[1].toUpperCase();
       setCurrentArea(areaCode);
+      // Default to showing all listings on new postcode
+      setListingFilterType("all");
       
       // If in properties mode, fetch listings
       if (sidebarMode === "properties") {
-        fetchListings(areaCode, "sale");
+        fetchListingsBoth(areaCode);
       }
     }
-  }, [sendMessage, sidebarMode, fetchListings]);
+  }, [sendMessage, sidebarMode, fetchListingsBoth]);
 
   const handleReset = useCallback(() => {
     reset();
@@ -133,14 +129,14 @@ export default function Home() {
   }, [comparedAreas, applyA2UIMessages]);
 
   const hasA2UIContent = state.a2uiState.isReady && state.a2uiState.rootId;
-  console.log("[PAGE] hasA2UIContent:", hasA2UIContent, "isReady:", state.a2uiState.isReady, "rootId:", state.a2uiState.rootId);
+  // console.log("[PAGE] hasA2UIContent:", hasA2UIContent, "isReady:", state.a2uiState.isReady, "rootId:", state.a2uiState.rootId);
   
   // Helper function to filter A2UI state by data model path
   const filterA2UIByPath = useCallback((path: string) => {
-    console.log("[filterA2UIByPath] Called with path:", path);
-    console.log("[filterA2UIByPath] Full data model:", state.a2uiState.dataModel);
+    // console.log("[filterA2UIByPath] Called with path:", path);
+    // console.log("[filterA2UIByPath] Full data model:", state.a2uiState.dataModel);
     if (!state.a2uiState.dataModel) {
-      console.log("[filterA2UIByPath] No data model, returning empty state");
+      // console.log("[filterA2UIByPath] No data model, returning empty state");
       return state.a2uiState;
     }
     
@@ -150,10 +146,10 @@ export default function Home() {
       dataModel
     );
     
-    console.log("[filterA2UIByPath] Path data for", path, ":", pathData);
+    // console.log("[filterA2UIByPath] Path data for", path, ":", pathData);
     
     if (!pathData) {
-      console.log("[filterA2UIByPath] No data at path, returning not ready");
+      // console.log("[filterA2UIByPath] No data at path, returning not ready");
       return { ...state.a2uiState, isReady: false };
     }
     
@@ -187,35 +183,30 @@ export default function Home() {
       console.log("[AUTO-SWITCH] Has investment:", !!dataModel.investment);
       console.log("[AUTO-SWITCH] Has prediction:", !!dataModel.prediction);
       console.log("[AUTO-SWITCH] Has carbon:", !!dataModel.carbon);
-      console.log("[AUTO-SWITCH] Has comparison:", !!dataModel.comparison);
       
       // Property listings tool → properties tab
-      if (dataModel.comparison) {
-        console.log("[AUTO-SWITCH] Switching to comparison tab");
-        setSidebarMode("comparison");
-      }
-      else if (dataModel.listings?.properties) {
+      if (dataModel.listings?.properties) {
         console.log("[AUTO-SWITCH] Switching to properties tab");
         setSidebarMode("properties");
       }
       // Investment analysis tool → investment tab
       else if (dataModel.investment) {
-        console.log("[AUTO-SWITCH] Switching to investment tab");
+        // console.log("[AUTO-SWITCH] Switching to investment tab");
         setSidebarMode("investment");
       }
       // Carbon/sustainability tool → sustainability tab
       else if (dataModel.carbon) {
-        console.log("[AUTO-SWITCH] Switching to sustainability tab");
+        // console.log("[AUTO-SWITCH] Switching to sustainability tab");
         setSidebarMode("sustainability");
       }
       // Rent forecast or other prediction tools → valuation tab
       else if (dataModel.prediction) {
-        console.log("[AUTO-SWITCH] Switching to valuation tab");
+        // console.log("[AUTO-SWITCH] Switching to valuation tab");
         setSidebarMode("valuation");
       }
       // Default: valuation tab for any other A2UI content
       else {
-        console.log("[AUTO-SWITCH] Defaulting to valuation tab");
+        // console.log("[AUTO-SWITCH] Defaulting to valuation tab");
         setSidebarMode("valuation");
       }
     }
@@ -257,6 +248,26 @@ export default function Home() {
 
   const propertiesFromAgent = getPropertiesFromDataModel();
 
+  // Auto-fetch listings when area or filter changes (no click needed)
+  useEffect(() => {
+    if (!currentArea) return;
+    const h = setTimeout(() => {
+      if (listingFilterType === "all") {
+        fetchListingsBoth(currentArea);
+      } else {
+        fetchListings(currentArea, listingFilterType);
+      }
+    }, 500);
+    return () => clearTimeout(h);
+  }, [currentArea, listingFilterType, fetchListings, fetchListingsBoth]);
+
+  // Reset filter to "all" when postcode changes to show both initially
+  useEffect(() => {
+    if (currentArea) {
+      setListingFilterType("all");
+    }
+  }, [currentArea]);
+
   return (
     <main className="h-screen w-screen flex flex-col bg-gradient-to-br from-background via-background to-muted/20 overflow-hidden">
       <header className="flex-shrink-0 border-b bg-card/80 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60">
@@ -294,46 +305,7 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden w-full min-w-0 min-h-0">
-        {/* Chat history sidebar: New chat + past conversations */}
-        <div className="w-52 flex-shrink-0 border-r bg-muted/30 flex flex-col overflow-hidden">
-          <div className="p-2 border-b flex-shrink-0">
-            <Button
-              variant="default"
-              size="sm"
-              className="w-full gap-2"
-              onClick={handleNewChat}
-            >
-              <MessageSquarePlus className="h-4 w-4" />
-              New chat
-            </Button>
-          </div>
-          <div className="flex-1 overflow-y-auto py-2">
-            {conversations.length === 0 ? (
-              <p className="text-muted-foreground text-xs px-3 py-2">No past chats yet</p>
-            ) : (
-              <ul className="space-y-0.5 px-2">
-                {conversations.map((c) => (
-                  <li key={c.id}>
-                    <button
-                      type="button"
-                      onClick={() => handleLoadConversation(c.id)}
-                      className={`w-full text-left rounded-lg px-3 py-2 text-sm truncate transition-colors ${
-                        state.conversationId === c.id
-                          ? "bg-primary text-primary-foreground"
-                          : "hover:bg-muted"
-                      }`}
-                      title={c.title || "Chat"}
-                    >
-                      {c.title || "Chat"}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </div>
-
+      <div className="flex-1 flex overflow-hidden w-full min-h-0">
         {/* Sidebar - only show after user sends first message */}
         {state.messages.length > 0 && (
           <div className="w-14 flex-shrink-0 border-r bg-card/50 flex flex-col items-center justify-start py-3 gap-1.5">
@@ -398,7 +370,6 @@ export default function Home() {
               </Button>
             </Tooltip>
           </div>
-        )}
 
         {/* Chat Panel */}
         <div className={`flex-shrink min-w-0 border-r transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "w-full md:w-[45%] lg:w-[38%]" : "w-full"}`}>
@@ -436,7 +407,7 @@ export default function Home() {
                         />
                         
                         {/* Main Insights */}
-                        <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-1 border-2 border-blue-200 dark:border-blue-800/50 shadow-lg">
+                        <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-1 border border-border shadow-lg">
                           <A2UIRenderer state={filterA2UIByPath('prediction')} />
                         </div>
                         
@@ -456,8 +427,8 @@ export default function Home() {
                 ) : (
                   <div className="h-full flex items-center justify-center">
                     <div className="text-center px-8 py-12 max-w-md">
-                      <div className="w-20 h-20 mx-auto mb-6 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-                        <BarChart3 className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+                      <div className="w-20 h-20 mx-auto mb-6 bg-muted rounded-full flex items-center justify-center">
+                        <BarChart3 className="w-10 h-10 text-foreground" />
                       </div>
                       <h3 className="text-lg font-semibold mb-2">Insights Panel</h3>
                       <p className="text-sm text-muted-foreground">
@@ -541,9 +512,32 @@ export default function Home() {
                   <div className="flex items-center justify-between">
                     <div>
                       <h2 className="text-lg font-semibold text-foreground">Property Finder</h2>
-                      <p className="text-xs text-muted-foreground">Find properties with images, links, and reviews</p>
+                      <p className="text-xs text-muted-foreground">Type an area code (e.g., NW1) and fetch listings</p>
                     </div>
-                    <div className="flex items-center gap-1 bg-muted rounded-md p-1">
+                    <div className="flex items-center gap-2">
+                      {/* Listing type dropdown (also triggers fetch) */}
+                      <select
+                        value={listingFilterType}
+                        onChange={(e) => {
+                          const val = e.target.value as "all" | "rent" | "sale";
+                          setListingFilterType(val);
+                          if (currentArea) {
+                            if (val === "all") {
+                              fetchListingsBoth(currentArea);
+                            } else {
+                              fetchListings(currentArea, val);
+                            }
+                          }
+                        }}
+                        className="h-7 px-2 text-xs border rounded-md bg-background"
+                        aria-label="Listing Type"
+                      >
+                        <option value="all">All</option>
+                        <option value="rent">Rent</option>
+                        <option value="sale">Sale</option>
+                      </select>
+                      {/* View toggle */}
+                      <div className="flex items-center gap-1 bg-muted rounded-md p-1">
                       <Button
                         variant={viewMode === "list" ? "secondary" : "ghost"}
                         size="sm"
@@ -562,20 +556,33 @@ export default function Home() {
                         <Map className="h-4 w-4 mr-1" />
                         <span className="text-xs">Map</span>
                       </Button>
+                      </div>
                     </div>
+                  </div>
+                  {/* Area code input (auto-fetch) */}
+                  <div className="mt-3 grid grid-cols-1 gap-2">
+                    <input
+                      className="h-9 px-3 border rounded-md bg-background text-sm"
+                      placeholder="Enter area code (e.g., NW1)"
+                      value={currentArea}
+                      onChange={(e) => setCurrentArea(e.target.value.toUpperCase())}
+                    />
                   </div>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex-1 overflow-hidden">
                   {viewMode === "list" ? (
                     <PropertyListView 
                       properties={propertiesFromAgent.length > 0 ? propertiesFromAgent : propertyState.properties}
                       isLoading={state.isLoading || propertyState.isLoading}
                       error={propertyState.error}
+                      forcedFilterType={listingFilterType}
                     />
                   ) : (
-                    <PropertyMapView />
+                    <PropertyMapView 
+                      properties={propertiesFromAgent.length > 0 ? propertiesFromAgent : propertyState.properties}
+                    />
                   )}
                 </div>
               </div>
@@ -583,11 +590,11 @@ export default function Home() {
             
             {/* Sustainability Assessment Page */}
             {sidebarMode === "sustainability" && (
-              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-violet-50 via-background to-purple-50 dark:from-violet-950/20 dark:via-background dark:to-purple-950/20">
-                <div className="flex-shrink-0 p-4 border-b-2 border-violet-200 dark:border-violet-800 bg-violet-50/50 dark:bg-violet-950/30">
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
+                <div className="flex-shrink-0 p-4 border-b bg-card/50">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg">
-                      <LineChart className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                    <div className="p-2 bg-muted rounded-lg">
+                      <LineChart className="h-5 w-5 text-foreground" />
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-foreground">Sustainability Assessment</h2>
@@ -598,7 +605,7 @@ export default function Home() {
                 <div className="flex-1 overflow-y-auto p-6">
                   {hasA2UIContent ? (
                     <div className="space-y-6">
-                      <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-4 border-2 border-violet-200 dark:border-violet-800/50 shadow-lg">
+                      <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-4 border border-border shadow-lg">
                         <A2UIRenderer state={filterA2UIByPath('carbon')} />
                       </div>
                       <InsightsDisclaimer />
@@ -606,8 +613,8 @@ export default function Home() {
                   ) : (
                     <div className="h-full flex items-center justify-center">
                       <div className="text-center px-8 py-12 max-w-md">
-                        <div className="w-20 h-20 mx-auto mb-6 bg-violet-100 dark:bg-violet-900/30 rounded-full flex items-center justify-center">
-                          <LineChart className="w-10 h-10 text-violet-600 dark:text-violet-400" />
+                        <div className="w-20 h-20 mx-auto mb-6 bg-muted rounded-full flex items-center justify-center">
+                          <LineChart className="w-10 h-10 text-foreground" />
                         </div>
                         <h3 className="text-lg font-semibold mb-2">Sustainability Assessment</h3>
                         <p className="text-sm text-muted-foreground mb-4">
@@ -625,11 +632,11 @@ export default function Home() {
             
             {/* Investment Analysis Page */}
             {sidebarMode === "investment" && (
-              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-emerald-50 via-background to-green-50 dark:from-emerald-950/20 dark:via-background dark:to-green-950/20">
-                <div className="flex-shrink-0 p-4 border-b-2 border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30">
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
+                <div className="flex-shrink-0 p-4 border-b bg-card/50">
                   <div className="flex items-center gap-2">
-                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-lg">
-                      <Calculator className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                    <div className="p-2 bg-muted rounded-lg">
+                      <Calculator className="h-5 w-5 text-foreground" />
                     </div>
                     <div>
                       <h2 className="text-lg font-semibold text-foreground">Investment Analysis</h2>
@@ -640,7 +647,7 @@ export default function Home() {
                 <div className="flex-1 overflow-y-auto p-6">
                   {hasA2UIContent ? (
                     <div className="space-y-6">
-                      <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-4 border-2 border-emerald-200 dark:border-emerald-800/50 shadow-lg">
+                      <div className="bg-white/50 dark:bg-slate-900/50 rounded-xl p-4 border border-border shadow-lg">
                         <A2UIRenderer state={filterA2UIByPath('investment')} />
                       </div>
                       <InsightsDisclaimer />
@@ -666,8 +673,8 @@ export default function Home() {
                   ) : (
                     <div className="h-full flex items-center justify-center">
                       <div className="text-center px-8 py-12 max-w-md">
-                        <div className="w-20 h-20 mx-auto mb-6 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
-                          <Calculator className="w-10 h-10 text-emerald-600 dark:text-emerald-400" />
+                        <div className="w-20 h-20 mx-auto mb-6 bg-muted rounded-full flex items-center justify-center">
+                          <Calculator className="w-10 h-10 text-foreground" />
                         </div>
                         <h3 className="text-lg font-semibold mb-2">Investment Calculator</h3>
                         <p className="text-sm text-muted-foreground mb-4">

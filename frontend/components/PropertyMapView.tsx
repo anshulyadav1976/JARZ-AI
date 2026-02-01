@@ -1,20 +1,49 @@
 "use client";
 
-import React from "react";
-import { MapPin } from "lucide-react";
+import dynamic from 'next/dynamic';
+import { Loader2 } from 'lucide-react';
 
-export function PropertyMapView() {
-  return (
-    <div className="h-full flex items-center justify-center bg-muted/20">
-      <div className="text-center px-8 py-12 max-w-md">
-        <div className="w-20 h-20 mx-auto mb-6 bg-primary/10 rounded-full flex items-center justify-center">
-          <MapPin className="w-10 h-10 text-primary" />
+interface Property {
+  id: string;
+  title: string;
+  price: number;
+  type: "sale" | "rent";
+  location: string;
+  beds: number;
+  baths: number;
+  sqft: number;
+  url: string;
+  imageUrl?: string;
+  lat?: number;
+  lng?: number;
+  amenities?: Array<{
+    type: string;
+    name: string;
+    distance: number;
+  }>;
+}
+
+interface PropertyMapViewProps {
+  properties?: Property[];
+  center?: [number, number];
+}
+
+// Dynamically import the map component with SSR disabled
+const PropertyMapViewClient = dynamic(
+  () => import('./PropertyMapViewClient').then(mod => ({ default: mod.PropertyMapViewClient })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full w-full flex items-center justify-center bg-muted/20">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Loading map...</p>
         </div>
-        <h3 className="text-lg font-semibold mb-2">Map View</h3>
-        <p className="text-sm text-muted-foreground">
-          Interactive map with property locations will be displayed here. Integration with mapping library coming soon.
-        </p>
       </div>
-    </div>
-  );
+    ),
+  }
+);
+
+export function PropertyMapView({ properties = [], center }: PropertyMapViewProps) {
+  return <PropertyMapViewClient properties={properties} center={center} />;
 }
