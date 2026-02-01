@@ -1,42 +1,21 @@
-"""ScanSan API client - Always uses real API, no mock fallback."""
+"""ScanSan API client - Always uses real API, no mock fallback.
+API responses are cached via backend/app/cache.py (persisted to backend/cache.json)
+so repeated calls and backend restarts stay fast for demos.
+"""
 import asyncio
 import hashlib
-import time
 from typing import Any, Optional
 import re
 import httpx
 from .config import get_settings
 from .schemas import ResolvedLocation, Neighbor
+from . import cache as persistent_cache
 
 
-# In-memory cache
-_cache: dict[str, tuple[float, Any]] = {}
-
-
-def _cache_key(method: str, *args, **kwargs) -> str:
-    """Generate cache key from method and arguments."""
-    key_data = f"{method}:{args}:{sorted(kwargs.items())}"
-    return hashlib.md5(key_data.encode()).hexdigest()
-
-
-def _get_cached(key: str) -> Optional[Any]:
-    """Get value from cache if not expired."""
-    settings = get_settings()
-    if not settings.enable_cache:
-        return None
-    if key in _cache:
-        timestamp, value = _cache[key]
-        if time.time() - timestamp < settings.cache_ttl_seconds:
-            return value
-        del _cache[key]
-    return None
-
-
-def _set_cached(key: str, value: Any) -> None:
-    """Set value in cache."""
-    settings = get_settings()
-    if settings.enable_cache:
-        _cache[key] = (time.time(), value)
+def _scansan_cache_key(endpoint: str, params: Optional[dict] = None) -> str:
+    """Stable cache key for ScanSan request (endpoint + params)."""
+    key_data = f"{endpoint}:{sorted((params or {}).items())}"
+    return "scansan:" + hashlib.md5(key_data.encode()).hexdigest()
 
 
 # ============================================================================
@@ -84,27 +63,30 @@ class ScanSanClient:
             print("[SCANSAN] API disabled (USE_SCANSAN=false). Using offline fallbacks where possible.")
             return None
         
-        # Check cache
-        cache_key = _cache_key(endpoint, params=params)
-        cached = _get_cached(cache_key)
-        if cached is not None:
-            print(f"[SCANSAN] Cache hit for {endpoint}")
-            return cached
-        
+        # Check persistent cache (API response – survives restarts, makes demos fast)
+        settings = get_settings()
+        cache_key = _scansan_cache_key(endpoint, params=params) if settings.enable_cache else None
+        if cache_key:
+            cached = persistent_cache.get(cache_key)
+            if cached is not None:
+                print(f"[SCANSAN] Cache hit for {endpoint}")
+                return cached
+
         client = await self._get_client()
         endpoint = self._normalize_endpoint(endpoint)
         last_error = None
-        
+
         for attempt in range(retries):
             try:
                 if method.upper() == "GET":
                     response = await client.get(endpoint, params=params)
                 else:
                     response = await client.post(endpoint, json=params)
-                
+
                 response.raise_for_status()
                 data = response.json()
-                _set_cached(cache_key, data)
+                if cache_key:
+                    persistent_cache.set_(cache_key, data, ttl_seconds=settings.cache_ttl_seconds)
                 return data
                 
             except httpx.HTTPStatusError as e:
@@ -276,14 +258,17 @@ class ScanSanClient:
         self,
         district: str,
         period: Optional[str] = None,
+        additional_data: bool = False,
     ) -> Optional[dict]:
-        """Get demand data for district."""
+        """Get rental demand data for district."""
         params = {}
         if period:
             params["period"] = period
-        
+        if additional_data:
+            params["additional_data"] = additional_data
+
         print(f"[SCANSAN] GET /v1/district/{district}/rent/demand")
-        data = await self._request("GET", f"/v1/district/{district}/rent/demand", params)
+        data = await self._request("GET", f"/v1/district/{district}/rent/demand", params or None)
         
         if data and "data" in data:
             print(f"[SCANSAN] Demand data found for {district}")

@@ -94,3 +94,6 @@ class ChatAgentState(TypedDict, total=False):
     
     # Whether the agent should continue (tool calling loop)
     should_continue: bool
+
+    # Optional user profile for personalisation (name, role, bio, interests, preferences)
+    profile: Optional[dict[str, Any]]

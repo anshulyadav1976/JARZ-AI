@@ -4,22 +4,44 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional
 from pydantic import BaseModel
 
+import csv
+import io
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from sse_starlette.sse import EventSourceResponse
 
 from .schemas import UserQuery, QueryRequest, QueryResponse
 from .agent.graph import run_agent, stream_agent, run_chat_agent, stream_chat_agent
 from .agent.state import ChatMessage
 from .scansan_client import get_scansan_client
+from . import db as chat_db
 from .llm_client import get_llm_client
+from .agent.tools import execute_compare_areas
 
 
 # Request models for chat API
+class UserProfile(BaseModel):
+    """Optional user profile for personalisation (injected into system prompt)."""
+    name: Optional[str] = None
+    role: Optional[str] = None  # "investor" | "property_agent" | "individual"
+    bio: Optional[str] = None
+    interests: Optional[list[str]] = None  # e.g. sustainability, investment_returns, location_comparison
+    preferences: Optional[str] = None  # free text: what they're looking for
+
+
 class ChatRequest(BaseModel):
     """Request for chat endpoint."""
     message: str
     history: Optional[list[dict]] = None
+    conversation_id: Optional[str] = None
+    profile: Optional[UserProfile] = None
+
+
+class CompareAreasRequest(BaseModel):
+    """Request for area comparison endpoint."""
+    areas: list[str]
 
 
 @asynccontextmanager
@@ -27,6 +49,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     # Startup
     print("Starting JARZ Rental Valuation API...")
+    chat_db.init_db()
     yield
     # Shutdown
     scansan_client = get_scansan_client()
@@ -224,6 +247,160 @@ async def get_amenities(area_code_postal: str):
 
 
 # =============================================================================
+# District / Postcode Data (Growth, Demand, Valuations, Sale History)
+# =============================================================================
+
+@app.get("/api/district/{district}/growth")
+async def get_district_growth(district: str):
+    """Get month-on-month and year-on-year growth for district."""
+    client = get_scansan_client()
+    data = await client.get_district_growth(district.strip().upper())
+    if data is None:
+        return {"success": False, "district": district, "data": None}
+    return {"success": True, "district": district, "data": data.get("data"), "area_code": data.get("area_code")}
+
+
+@app.get("/api/district/{district}/rent/demand")
+async def get_district_rent_demand(
+    district: str,
+    period: Optional[str] = None,
+    additional_data: bool = False,
+):
+    """Get rental demand data for district."""
+    client = get_scansan_client()
+    data = await client.get_district_demand(
+        district.strip().upper(),
+        period=period,
+        additional_data=additional_data,
+    )
+    if data is None:
+        return {"success": False, "district": district, "data": None}
+    return {
+        "success": True,
+        "district": district,
+        "data": data.get("data"),
+        "area_code": data.get("area_code"),
+        "target_month": data.get("target_month"),
+        "target_year": data.get("target_year"),
+    }
+
+
+@app.get("/api/district/{district}/sale/demand")
+async def get_district_sale_demand(
+    district: str,
+    period: Optional[str] = None,
+    additional_data: bool = False,
+):
+    """Get sales demand data for district."""
+    client = get_scansan_client()
+    data = await client.get_sale_demand(
+        district.strip().upper(),
+        period=period,
+        additional_data=additional_data,
+    )
+    if data is None:
+        return {"success": False, "district": district, "data": None}
+    return {
+        "success": True,
+        "district": district,
+        "data": data.get("data"),
+        "area_code": data.get("area_code"),
+        "target_month": data.get("target_month"),
+        "target_year": data.get("target_year"),
+    }
+
+
+@app.get("/api/postcode/{postcode}/valuations/current")
+async def get_postcode_valuations_current(postcode: str):
+    """Get current valuations for each address in postcode."""
+    client = get_scansan_client()
+    data = await client.get_current_valuations(postcode.strip().replace(" ", "").upper())
+    if data is None:
+        return {"success": False, "postcode": postcode, "data": None}
+    return {"success": True, "postcode": postcode, "data": data.get("data")}
+
+
+@app.get("/api/postcode/{postcode}/valuations/historical")
+async def get_postcode_valuations_historical(postcode: str):
+    """Get historical valuations for each address in postcode."""
+    client = get_scansan_client()
+    data = await client.get_historical_valuations(postcode.strip().replace(" ", "").upper())
+    if data is None:
+        return {"success": False, "postcode": postcode, "data": None}
+    return {"success": True, "postcode": postcode, "data": data.get("data")}
+
+
+@app.get("/api/postcode/{postcode}/sale/history")
+async def get_postcode_sale_history(postcode: str):
+    """Get sale history for properties in postcode."""
+    client = get_scansan_client()
+    data = await client.get_sale_history(postcode.strip().replace(" ", "").upper())
+    if data is None:
+        return {"success": False, "postcode": postcode, "data": None}
+    return {"success": True, "postcode": postcode, "data": data.get("data")}
+
+
+@app.get("/api/postcode/{postcode}/sale/history/export")
+async def export_postcode_sale_history(postcode: str):
+    """Export sale history for postcode as CSV download."""
+    client = get_scansan_client()
+    data = await client.get_sale_history(postcode.strip().replace(" ", "").upper())
+    if data is None or not data.get("data"):
+        raise HTTPException(status_code=404, detail="No sale history found for this postcode")
+
+    rows = []
+    for prop in data["data"]:
+        addr = prop.get("property_address", "")
+        uprn = prop.get("uprn", "")
+        ptype = prop.get("property_type", "")
+        for tx in prop.get("transactions", []):
+            rows.append({
+                "property_address": addr,
+                "uprn": uprn,
+                "property_type": ptype,
+                "sold_date": tx.get("sold_date", ""),
+                "sold_price": tx.get("sold_price", ""),
+                "property_tenure": tx.get("property_tenure", ""),
+                "price_diff_amount": tx.get("price_diff_amount", ""),
+                "price_diff_percentage": tx.get("price_diff_percentage", ""),
+            })
+
+    if not rows:
+        raise HTTPException(status_code=404, detail="No transactions found for this postcode")
+
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=list(rows[0].keys()), lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+    csv_str = out.getvalue()
+
+    safe_postcode = postcode.strip().replace(" ", "").upper()
+    return Response(
+        content=csv_str,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="sale_history_{safe_postcode}.csv"'},
+    )
+
+
+@app.post("/api/areas/compare")
+async def compare_areas_endpoint(request: CompareAreasRequest):
+    """
+    Compare 2-3 areas using ScanSan area summary.
+
+    This endpoint is intended for the frontend "Location Comparison" tab.
+    It returns a2ui_messages so the UI can render charts without involving the LLM.
+    """
+    result = await execute_compare_areas(areas=request.areas)
+    return {
+        "success": bool(result.get("success")),
+        "areas": result.get("areas", []),
+        "winners": result.get("winners", {}),
+        "a2ui_messages": result.get("a2ui_messages", []),
+        "summary": result.get("summary"),
+    }
+
+
+# =============================================================================
 # Chat API Endpoints
 # =============================================================================
 
@@ -276,13 +453,37 @@ async def chat_endpoint(request: ChatRequest) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _profile_to_dict(profile: Optional[UserProfile]) -> Optional[dict]:
+    """Convert UserProfile to dict for agent state."""
+    if not profile:
+        return None
+    d = profile.model_dump(exclude_none=True)
+    return d if d else None
+
+
 async def generate_chat_sse_events(
     message: str,
     history: list[ChatMessage] = None,
+    conversation_id: Optional[str] = None,
+    profile: Optional[dict] = None,
 ) -> AsyncGenerator[dict, None]:
-    """Generate SSE events from chat agent execution."""
+    """Generate SSE events from chat agent execution. Persists to DB and emits conversation_id on complete."""
+    history = history or []
+    # Resolve or create conversation and persist user message
+    cid = conversation_id
+    if not cid:
+        title = (message[:200].strip() or "New chat") if message else "New chat"
+        cid = chat_db.create_conversation(title=title)
+        chat_db.add_message(cid, "user", message)
+    else:
+        chat_db.add_message(cid, "user", message)
+        chat_db.update_conversation_updated_at(cid)
+
+    accumulated_text: list[str] = []
+    a2ui_for_save: list = []
+
     try:
-        async for event in stream_chat_agent(message, history):
+        async for event in stream_chat_agent(message, history, profile=profile):
             event_type = event.get("type", "unknown")
             
             if event_type == "node":
@@ -295,10 +496,12 @@ async def generate_chat_sse_events(
                 }
             
             elif event_type == "text":
+                content = event.get("content", "")
+                accumulated_text.append(content)
                 yield {
                     "event": "text",
                     "data": json.dumps({
-                        "content": event.get("content", ""),
+                        "content": content,
                     }),
                 }
             
@@ -317,6 +520,15 @@ async def generate_chat_sse_events(
                     "data": json.dumps({
                         "tool": event.get("tool"),
                         "success": event.get("success"),
+                    }),
+                }
+            
+            elif event_type == "market_data_request":
+                yield {
+                    "event": "market_data_request",
+                    "data": json.dumps({
+                        "district": event.get("district"),
+                        "postcode": event.get("postcode"),
                     }),
                 }
             
@@ -343,17 +555,21 @@ async def generate_chat_sse_events(
                 }
             
             elif event_type == "complete":
+                a2ui_for_save = event.get("a2ui_messages", [])
                 # Stream any remaining A2UI messages
-                for a2ui_msg in event.get("a2ui_messages", []):
+                for a2ui_msg in a2ui_for_save:
                     yield {
                         "event": "a2ui",
                         "data": json.dumps(a2ui_msg),
                     }
-                
+                # Persist assistant message (text + A2UI snapshot for replay)
+                full_text = "".join(accumulated_text)
+                chat_db.add_message(cid, "assistant", full_text, a2ui_snapshot=a2ui_for_save)
                 yield {
                     "event": "complete",
                     "data": json.dumps({
                         "status": "complete",
+                        "conversation_id": cid,
                     }),
                 }
     
@@ -368,6 +584,8 @@ async def generate_chat_sse_events(
 async def chat_stream_endpoint(request: ChatRequest):
     """
     Streaming chat endpoint - returns SSE stream of text chunks and A2UI messages.
+    Persists messages to SQLite; optional conversation_id continues an existing chat.
+    Complete event includes conversation_id for new or existing conversations.
     
     Events:
     - status: Agent status updates (node, status)
@@ -376,11 +594,19 @@ async def chat_stream_endpoint(request: ChatRequest):
     - tool_end: Tool execution completed
     - a2ui: A2UI component message
     - error: Error occurred
-    - complete: Processing complete
+    - complete: Processing complete (includes conversation_id)
     """
-    # Convert history
     history: list[ChatMessage] = []
-    if request.history:
+    if request.conversation_id:
+        conv = chat_db.get_conversation_with_messages(request.conversation_id)
+        if conv and conv.get("messages"):
+            for msg in conv["messages"]:
+                if msg["role"] in ("user", "assistant", "system") and msg.get("content") is not None:
+                    history.append({
+                        "role": msg["role"],
+                        "content": msg["content"],
+                    })
+    if not history and request.history:
         for msg in request.history:
             history.append({
                 "role": msg.get("role", "user"),
@@ -390,10 +616,30 @@ async def chat_stream_endpoint(request: ChatRequest):
                 "name": msg.get("name"),
             })
     
+    profile_dict = _profile_to_dict(request.profile)
     return EventSourceResponse(
-        generate_chat_sse_events(request.message, history),
+        generate_chat_sse_events(request.message, history, request.conversation_id, profile=profile_dict),
         media_type="text/event-stream",
     )
+
+
+# =============================================================================
+# Conversation history API
+# =============================================================================
+
+@app.get("/api/conversations")
+async def list_conversations(limit: int = 50):
+    """List saved conversations, most recent first."""
+    return chat_db.get_conversations(limit=limit)
+
+
+@app.get("/api/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    """Get one conversation with all messages (for loading chat history)."""
+    conv = chat_db.get_conversation_with_messages(conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conv
 
 
 # =============================================================================

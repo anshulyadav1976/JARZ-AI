@@ -10,24 +10,58 @@ import { PropertyMapView } from "@/components/PropertyMapView";
 import { InsightsActions } from "@/components/InsightsActions";
 import { InsightsDisclaimer } from "@/components/InsightsDisclaimer";
 import { ComparisonMode } from "@/components/ComparisonMode";
-import { BudgetFilter } from "@/components/BudgetFilter";
 import { InvestmentCalculator } from "@/components/InvestmentCalculator";
 import { Tooltip } from "@/components/ui/tooltip-custom";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { BarChart3, Home as HomeIcon, User, TrendingUp, List, Map, Calculator, Sparkles, Search, Leaf } from "lucide-react";
+import { BarChart3, Home as HomeIcon, User, UserCircle, MessageSquarePlus, Menu, Sparkles, ArrowLeftRight, Search, Leaf, Calculator, Database, LineChart, List, Map } from "lucide-react";
+import { MarketDataPanel } from "@/components/MarketDataPanel";
+import {
+  getProfile,
+  saveProfile,
+  PROFILE_ROLE_LABELS,
+  INTEREST_OPTIONS,
+  type UserProfile,
+  type ProfileRole,
+  type InterestId,
+} from "@/lib/profile";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+interface ConversationSummary {
+  id: string;
+  title: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export default function Home() {
-  const { state, sendMessage, reset } = useChatStream();
+  const [marketTrigger, setMarketTrigger] = useState<{ district?: string | null; postcode?: string | null } | null>(null);
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const { state, sendMessage, reset, loadConversation, applyA2UIMessages } = useChatStream({
+    onMarketDataRequest: (data) => {
+      setSidebarMode("market");
+      setMarketTrigger({ district: data.district ?? null, postcode: data.postcode ?? null });
+    },
+  });
   const { state: propertyState, fetchListings, fetchListingsBoth } = usePropertyListings();
   const [activeTab, setActiveTab] = useState("home");
-  const [sidebarMode, setSidebarMode] = useState<"valuation" | "properties" | "sustainability" | "investment">("valuation");
+  const [sidebarMode, setSidebarMode] = useState<"valuation" | "comparison" | "properties" | "sustainability" | "investment" | "market">("valuation");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [listingFilterType, setListingFilterType] = useState<"all" | "rent" | "sale">("all");
   const [comparedAreas, setComparedAreas] = useState<string[]>([]);
   const [savedAreas, setSavedAreas] = useState<string[]>([]);
   const [currentArea, setCurrentArea] = useState<string>("");
   const [autoSwitchEnabled, setAutoSwitchEnabled] = useState(true);
+
+  // Profile form state (for Profile tab)
+  const [profileName, setProfileName] = useState("");
+  const [profileRole, setProfileRole] = useState<ProfileRole | "">("");
+  const [profileBio, setProfileBio] = useState("");
+  const [profileInterests, setProfileInterests] = useState<string[]>([]);
+  const [profilePreferences, setProfilePreferences] = useState("");
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [chatHistoryOpen, setChatHistoryOpen] = useState(false);
 
   const handleSendMessage = useCallback((message: string) => {
     sendMessage(message);
@@ -52,6 +86,62 @@ export default function Home() {
     reset();
   }, [reset]);
 
+  const handleNewChat = useCallback(() => {
+    reset();
+  }, [reset]);
+
+  const handleLoadConversation = useCallback((id: string) => {
+    loadConversation(id);
+  }, [loadConversation]);
+
+  // Load profile from localStorage when opening Profile tab
+  useEffect(() => {
+    if (activeTab === "profile") {
+      const p = getProfile();
+      setProfileName(p?.name ?? "");
+      setProfileRole((p?.role as ProfileRole) ?? "");
+      setProfileBio(p?.bio ?? "");
+      setProfileInterests(p?.interests ?? []);
+      setProfilePreferences(p?.preferences ?? "");
+      setProfileSaved(false);
+    }
+  }, [activeTab]);
+
+  const handleProfileSave = useCallback(() => {
+    const profile: UserProfile = {
+      name: profileName.trim() || null,
+      role: profileRole || null,
+      bio: profileBio.trim() || null,
+      interests: profileInterests.length ? profileInterests : null,
+      preferences: profilePreferences.trim() || null,
+    };
+    saveProfile(profile);
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2000);
+  }, [profileName, profileRole, profileBio, profileInterests, profilePreferences]);
+
+  const toggleProfileInterest = useCallback((id: InterestId) => {
+    setProfileInterests((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
+
+  // Fetch conversation list (on mount and when current conversation changes so new chats appear)
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${API_URL}/api/conversations`)
+      .then((res) => (res.ok ? res.json() : []))
+      .then((list: ConversationSummary[]) => {
+        if (!cancelled) setConversations(Array.isArray(list) ? list : []);
+      })
+      .catch(() => {
+        if (!cancelled) setConversations([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [state.conversationId]);
+
   const handleAddCompareArea = useCallback((areaCode: string) => {
     if (!comparedAreas.includes(areaCode) && comparedAreas.length < 3) {
       setComparedAreas([...comparedAreas, areaCode]);
@@ -71,16 +161,29 @@ export default function Home() {
       }
     }
   }, [currentArea, savedAreas]);
-
-  const handleBudgetSearch = useCallback((budget: number, bedrooms?: number) => {
-    const bedroomText = bedrooms ? `${bedrooms}-bedroom ` : "";
-    sendMessage(`Show me areas where I can rent a ${bedroomText}property for around £${budget} per month`);
-  }, [sendMessage]);
   
   const handleManualSidebarChange = useCallback((mode: typeof sidebarMode) => {
     setSidebarMode(mode);
     setAutoSwitchEnabled(false); // Disable auto-switch when user manually changes tab
   }, []);
+
+  const handleRunComparison = useCallback(async () => {
+    if (comparedAreas.length < 2) return;
+    try {
+      const res = await fetch(`${API_URL}/api/areas/compare`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ areas: comparedAreas }),
+      });
+      const data = await res.json();
+      if (data?.a2ui_messages) {
+        applyA2UIMessages(data.a2ui_messages);
+        setSidebarMode("comparison");
+      }
+    } catch (e) {
+      console.error("Comparison request failed", e);
+    }
+  }, [comparedAreas, applyA2UIMessages]);
 
   const hasA2UIContent = state.a2uiState.isReady && state.a2uiState.rootId;
   // console.log("[PAGE] hasA2UIContent:", hasA2UIContent, "isReady:", state.a2uiState.isReady, "rootId:", state.a2uiState.rootId);
@@ -131,16 +234,16 @@ export default function Home() {
     if (hasA2UIContent && state.a2uiState.dataModel && autoSwitchEnabled) {
       const dataModel = state.a2uiState.dataModel as any;
       
-      // console.log("[AUTO-SWITCH] Data model:", dataModel);
-      // console.log("[AUTO-SWITCH] Has listings:", !!dataModel.listings);
-      // console.log("[AUTO-SWITCH] Has properties:", !!dataModel.listings?.properties);
-      // console.log("[AUTO-SWITCH] Has investment:", !!dataModel.investment);
-      // console.log("[AUTO-SWITCH] Has prediction:", !!dataModel.prediction);
-      // console.log("[AUTO-SWITCH] Has carbon:", !!dataModel.carbon);
+      console.log("[AUTO-SWITCH] Data model:", dataModel);
+      console.log("[AUTO-SWITCH] Has listings:", !!dataModel.listings);
+      console.log("[AUTO-SWITCH] Has properties:", !!dataModel.listings?.properties);
+      console.log("[AUTO-SWITCH] Has investment:", !!dataModel.investment);
+      console.log("[AUTO-SWITCH] Has prediction:", !!dataModel.prediction);
+      console.log("[AUTO-SWITCH] Has carbon:", !!dataModel.carbon);
       
       // Property listings tool → properties tab
       if (dataModel.listings?.properties) {
-        // console.log("[AUTO-SWITCH] Switching to properties tab");
+        console.log("[AUTO-SWITCH] Switching to properties tab");
         setSidebarMode("properties");
       }
       // Investment analysis tool → investment tab
@@ -227,6 +330,19 @@ export default function Home() {
       <header className="flex-shrink-0 border-b bg-card/80 backdrop-blur-xl supports-[backdrop-filter]:bg-card/60">
         <div className="w-full flex h-16 items-center justify-between px-6 max-w-full">
           <div className="flex items-center gap-3">
+            {activeTab === "home" && (
+              <Tooltip content={chatHistoryOpen ? "Close chat history" : "Open chat history"} side="right">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setChatHistoryOpen((o) => !o)}
+                  className="w-9 h-9 shrink-0"
+                  aria-label={chatHistoryOpen ? "Close chat history" : "Open chat history"}
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </Tooltip>
+            )}
             <div className="flex items-center justify-center w-7 h-7">
               <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M4 24L14 4L24 24H4Z" fill="currentColor" className="text-foreground"/>
@@ -247,6 +363,15 @@ export default function Home() {
               <span className="hidden sm:inline">Home</span>
             </Button>
             <Button
+              variant={activeTab === "profile" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("profile")}
+              className="gap-2"
+            >
+              <UserCircle className="h-4 w-4" />
+              <span className="hidden sm:inline">Profile</span>
+            </Button>
+            <Button
               variant={activeTab === "about" ? "secondary" : "ghost"}
               size="sm"
               onClick={() => setActiveTab("about")}
@@ -259,9 +384,123 @@ export default function Home() {
         </div>
       </header>
 
-      <div className="flex-1 flex overflow-hidden w-full min-h-0">
-        {/* Sidebar - always shown */}
-          <div className="w-14 flex-shrink-0 border-r bg-card/50 flex flex-col items-center justify-start py-3 gap-1.5">
+      {activeTab === "profile" ? (
+        <div className="flex-1 overflow-y-auto p-6 max-w-2xl mx-auto">
+          <h2 className="text-xl font-semibold mb-4">Your profile</h2>
+          <p className="text-muted-foreground text-sm mb-6">
+            This helps RentRadar personalise replies. Your name, role and interests are only used in the chat and are not stored on our servers.
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium block mb-1">Name</label>
+              <input
+                type="text"
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+                placeholder="e.g. Alex"
+                className="w-full h-9 px-3 rounded-md border bg-background text-sm"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">I am a</label>
+              <select
+                value={profileRole}
+                onChange={(e) => setProfileRole(e.target.value as ProfileRole | "")}
+                className="w-full h-9 px-3 rounded-md border bg-background text-sm"
+                aria-label="Profile role"
+              >
+                <option value="">— Select —</option>
+                {(Object.entries(PROFILE_ROLE_LABELS) as [ProfileRole, string][]).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">Short bio (optional)</label>
+              <textarea
+                value={profileBio}
+                onChange={(e) => setProfileBio(e.target.value)}
+                placeholder="A sentence about you"
+                rows={2}
+                className="w-full px-3 py-2 rounded-md border bg-background text-sm resize-none"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-2">Interests (tick what matters to you)</label>
+              <div className="flex flex-wrap gap-3">
+                {INTEREST_OPTIONS.map(({ id, label }) => (
+                  <label key={id} className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={profileInterests.includes(id)}
+                      onChange={() => toggleProfileInterest(id)}
+                      className="rounded border"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium block mb-1">What I&apos;m looking for (optional)</label>
+              <textarea
+                value={profilePreferences}
+                onChange={(e) => setProfilePreferences(e.target.value)}
+                placeholder="e.g. First buy in London, 2-bed, budget around £400k"
+                rows={2}
+                className="w-full px-3 py-2 rounded-md border bg-background text-sm resize-none"
+              />
+            </div>
+            <Button onClick={handleProfileSave} className="mt-4">
+              {profileSaved ? "Saved" : "Save profile"}
+            </Button>
+          </div>
+        </div>
+      ) : (
+      <div className="flex-1 flex overflow-hidden w-full min-w-0 min-h-0">
+        {/* Chat history sidebar: only when hamburger is toggled */}
+        {chatHistoryOpen && (
+        <div className="w-52 flex-shrink-0 border-r bg-muted/30 flex flex-col overflow-hidden">
+          <div className="p-2 border-b flex-shrink-0">
+            <Button
+              variant="default"
+              size="sm"
+              className="w-full gap-2"
+              onClick={handleNewChat}
+            >
+              <MessageSquarePlus className="h-4 w-4" />
+              New chat
+            </Button>
+          </div>
+          <div className="flex-1 overflow-y-auto py-2">
+            {conversations.length === 0 ? (
+              <p className="text-muted-foreground text-xs px-3 py-2">No past chats yet</p>
+            ) : (
+              <ul className="space-y-0.5 px-2">
+                {conversations.map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleLoadConversation(c.id)}
+                      className={`w-full text-left rounded-lg px-3 py-2 text-sm truncate transition-colors ${
+                        state.conversationId === c.id
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-muted"
+                      }`}
+                      title={c.title || "Chat"}
+                    >
+                      {c.title || "Chat"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        )}
+
+        {/* Icon sidebar - always visible for switching features */}
+        <div className="w-14 flex-shrink-0 border-r bg-card/50 flex flex-col items-center justify-start py-3 gap-1.5">
             <Tooltip content="Valuation & Insights" side="right">
               <Button
                 variant={sidebarMode === "valuation" ? "secondary" : "ghost"}
@@ -270,6 +509,16 @@ export default function Home() {
                 className="w-10 h-10"
               >
                 <Sparkles className="h-4 w-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Location Comparison" side="right">
+              <Button
+                variant={sidebarMode === "comparison" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => handleManualSidebarChange("comparison")}
+                className="w-10 h-10"
+              >
+                <ArrowLeftRight className="h-4 w-4" />
               </Button>
             </Tooltip>
             <Tooltip content="Property Finder" side="right">
@@ -302,10 +551,20 @@ export default function Home() {
                 <Calculator className="h-4 w-4" />
               </Button>
             </Tooltip>
+            <Tooltip content="Market Data" side="right">
+              <Button
+                variant={sidebarMode === "market" ? "secondary" : "ghost"}
+                size="icon"
+                onClick={() => handleManualSidebarChange("market")}
+                className="w-10 h-10"
+              >
+                <Database className="h-4 w-4" />
+              </Button>
+            </Tooltip>
           </div>
 
         {/* Chat Panel */}
-        <div className={`flex-shrink-0 border-r transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "w-full md:w-[45%] lg:w-[38%]" : "w-full"}`}>
+        <div className={`flex-shrink min-w-0 border-r transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "w-full md:w-[45%] lg:w-[38%]" : "w-full"}`}>
           <ChatPanel
             messages={state.messages}
             onSendMessage={handleSendMessage}
@@ -317,7 +576,7 @@ export default function Home() {
 
         {/* Insights/Property Panel */}
         {(
-          <div className={`flex-1 overflow-hidden transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "block" : "hidden md:block"}`}>
+          <div className={`flex-1 min-w-0 overflow-hidden transition-all duration-300 ${hasA2UIContent || sidebarMode !== "valuation" ? "block" : "hidden md:block"}`}>
             {/* Valuation & AI Insights */}
             {sidebarMode === "valuation" && (
               <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-blue-50 via-background to-indigo-50 dark:from-blue-950/20 dark:via-background dark:to-indigo-950/20">
@@ -374,6 +633,70 @@ export default function Home() {
             )}
             
             {/* Search & Filter Page removed */}
+
+            {/* Market Data (Growth, Demand, Valuations, Sale History) */}
+            {sidebarMode === "market" && (
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
+                <div className="flex-shrink-0 p-4 border-b bg-card/50">
+                  <h2 className="text-lg font-semibold text-foreground">Market Data</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Growth, rent & sale demand (district), current & historical valuations, sale history + export (postcode).
+                  </p>
+                </div>
+                <div className="flex-1 overflow-y-auto p-6">
+                  <MarketDataPanel
+                  defaultDistrict={currentArea}
+                  defaultPostcode={currentArea ? `${currentArea} 0BH` : ""}
+                  triggerDistrict={marketTrigger?.district}
+                  triggerPostcode={marketTrigger?.postcode}
+                  onTriggerConsumed={() => setMarketTrigger(null)}
+                />
+                </div>
+              </div>
+            )}
+
+            {/* Location Comparison Page */}
+            {sidebarMode === "comparison" && (
+              <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-background via-muted/10 to-muted/20">
+                <div className="flex-shrink-0 p-4 border-b bg-card/50">
+                  <h2 className="text-lg font-semibold text-foreground">Location Comparison</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Compare 2–3 areas using ScanSan area summary (ranges + listing counts).
+                  </p>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  <ComparisonMode
+                    comparedAreas={comparedAreas}
+                    onAddArea={handleAddCompareArea}
+                    onRemoveArea={handleRemoveCompareArea}
+                  />
+
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleRunComparison}
+                      disabled={comparedAreas.length < 2}
+                      className="gap-2"
+                    >
+                      Compare now
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => sendMessage(`Compare ${comparedAreas.join(" vs ")}`)}
+                      disabled={comparedAreas.length < 2}
+                    >
+                      Ask agent to compare
+                    </Button>
+                  </div>
+
+                  <div className="bg-white/60 dark:bg-slate-900/60 rounded-xl p-4 border-2 border-muted shadow">
+                    <A2UIRenderer state={filterA2UIByPath("comparison")} />
+                  </div>
+
+                  <InsightsDisclaimer />
+                </div>
+              </div>
+            )}
             
             {/* Property Finder Page */}
             {sidebarMode === "properties" && (
@@ -563,6 +886,7 @@ export default function Home() {
           </div>
         )}
       </div>
+      )}
 
       <footer className="flex-shrink-0 border-t bg-card/80 backdrop-blur">
         <div className="w-full px-6 py-3 max-w-full">
